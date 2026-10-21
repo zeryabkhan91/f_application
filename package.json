@@ -1,0 +1,50 @@
+{
+  "name": "f-application",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24.11 <25",
+    "npm": ">=11 <12"
+  },
+  "packageManager": "npm@11.9.0",
+  "scripts": {
+    "setup:local": "node scripts/setup-local.mjs",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:down": "docker compose stop postgres",
+    "db:generate": "npm run generate --workspace=@repo/db",
+    "db:migrate": "npm run migrate:dev --workspace=@repo/db",
+    "db:deploy": "npm run migrate:deploy --workspace=@repo/db",
+    "db:studio": "npm run studio --workspace=@repo/db",
+    "build": "npm run db:generate && tsc -b",
+    "typecheck": "tsc -b",
+    "dev": "npm run build && concurrently -k -n types,api \"tsc -b --watch --preserveWatchOutput\" \"npm run dev --workspace=@repo/api\"",
+    "start": "npm run start --workspace=@repo/api",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:integration": "node --env-file-if-exists=.env node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts",
+    "openapi:generate": "tsx apps/api/src/scripts/export-openapi.ts && prettier --write docs/openapi.json",
+    "check": "npm run build && npm run lint && npm test",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "^24.0.0",
+    "@types/supertest": "^6.0.3",
+    "concurrently": "^9.2.0",
+    "eslint": "10.13.0",
+    "globals": "^16.5.0",
+    "prettier": "^3.6.0",
+    "supertest": "^7.1.4",
+    "tsx": "^4.20.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.46.0",
+    "vitest": "^4.0.18"
+  }
+}
