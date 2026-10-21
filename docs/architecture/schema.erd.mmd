@@ -1,0 +1,981 @@
+%% Generated from packages/db/prisma/schema.prisma; run npm run erd:generate.
+erDiagram
+  User {
+    String id PK
+    String name
+    String email
+    String passwordHash
+    UserStatus status
+    DateTime lastLoginAt
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  Tenant {
+    String id PK
+    String name
+    String slug
+    TenantStatus status
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  TenantBranding {
+    String id PK
+    String tenantId FK
+    String applicationName
+    String logoUrl
+    String faviconUrl
+    Json primaryTheme
+    String customDomain
+    String supportEmail
+    Json invoiceBranding
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  Currency {
+    String id PK
+    String code
+    String name
+    String symbol
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  Country {
+    String id PK
+    String code
+    String name
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  UnitDefinition {
+    String id PK
+    String code
+    String name
+    String symbol
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  Permission {
+    String id PK
+    String code
+    String description
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  Organization {
+    String id PK
+    String tenantId FK
+    String name
+    String slug
+    String legalName
+    String phone
+    String email
+    String address
+    String city
+    String countryCode FK
+    String currencyCode FK
+    String timezone
+    String taxNumber
+    OrganizationStatus status
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  Role {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    RoleCode code
+    String name
+    RecordStatus status
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  RolePermission {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String roleId FK
+    String permissionId FK
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  Membership {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String userId FK
+    String roleId FK
+    MembershipStatus status
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  OrganizationSettings {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String defaultCurrency FK
+    Int defaultPaymentTermsDays
+    String invoiceFooter
+    String invoiceNotes
+    Boolean lowStockNotificationsEnabled
+    Boolean paymentReminderEnabled
+    Boolean allowNegativeStock
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  NumberSequence {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    NumberSequenceType type
+    String prefix
+    BigInt currentNumber
+    Int padding
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  Unit {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String definitionId FK
+    String code
+    String name
+    String symbol
+    RecordStatus status
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  Supplier {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String name
+    String companyName
+    String contactPerson
+    String phone
+    String email
+    String taxNumber
+    Int paymentTermsDays
+    Decimal openingBalance
+    String currencyCode FK
+    String notes
+    RecordStatus status
+    String address
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+    DateTime deletedAt
+  }
+  Customer {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String name
+    String companyName
+    String contactPerson
+    String phone
+    String email
+    String taxNumber
+    Int paymentTermsDays
+    Decimal openingBalance
+    String currencyCode FK
+    String notes
+    RecordStatus status
+    String billingAddress
+    String shippingAddress
+    Decimal creditLimit
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+    DateTime deletedAt
+  }
+  RawMaterial {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String name
+    String sku
+    String description
+    String unitId FK
+    Decimal minimumStockLevel
+    Decimal standardCost
+    RecordStatus status
+    Decimal reorderLevel
+    Decimal lastPurchaseCost
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+    DateTime deletedAt
+  }
+  Product {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String name
+    String sku
+    String description
+    String unitId FK
+    Decimal minimumStockLevel
+    Decimal standardCost
+    RecordStatus status
+    Decimal sellingPrice
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+    DateTime deletedAt
+  }
+  Warehouse {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String name
+    String code
+    String address
+    Boolean isDefault
+    RecordStatus status
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+    DateTime deletedAt
+  }
+  ExpenseCategory {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String name
+    RecordStatus status
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+    DateTime deletedAt
+  }
+  PurchaseOrder {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String purchaseOrderNumber
+    String supplierId FK
+    DateTime orderDate
+    DateTime expectedDeliveryDate
+    PurchaseOrderStatus status
+    String currencyCode FK
+    Decimal subtotal
+    Decimal discount
+    Decimal tax
+    Decimal total
+    String notes
+    DateTime voidedAt
+    String voidedBy FK
+    String voidReason
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  PurchaseOrderItem {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String purchaseOrderId FK
+    String rawMaterialId FK
+    String description
+    Decimal quantity
+    Decimal unitPrice
+    Decimal discount
+    Decimal tax
+    Decimal lineTotal
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  GoodsReceipt {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String receiptNumber
+    String purchaseOrderId FK
+    String supplierId FK
+    String warehouseId FK
+    DateTime receivedDate
+    GoodsReceiptStatus status
+    String notes
+    DateTime voidedAt
+    String voidedBy FK
+    String voidReason
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  GoodsReceiptItem {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String goodsReceiptId FK
+    String purchaseOrderId FK
+    String purchaseOrderItemId FK
+    String rawMaterialId FK
+    Decimal quantityReceived
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  SupplierInvoice {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String supplierInvoiceNumber
+    String internalReference
+    String supplierId FK
+    String purchaseOrderId FK
+    DateTime invoiceDate
+    DateTime dueDate
+    InvoiceStatus status
+    String currencyCode FK
+    Decimal subtotal
+    Decimal discount
+    Decimal tax
+    Decimal total
+    String notes
+    DateTime voidedAt
+    String voidedBy FK
+    String voidReason
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  SupplierInvoiceItem {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String supplierInvoiceId FK
+    String rawMaterialId FK
+    String description
+    Decimal quantity
+    Decimal unitPrice
+    Decimal discount
+    Decimal tax
+    Decimal lineTotal
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  SalesOrder {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String orderNumber
+    String customerId FK
+    DateTime orderDate
+    DateTime expectedDeliveryDate
+    SalesOrderStatus status
+    String currencyCode FK
+    Decimal subtotal
+    Decimal discount
+    Decimal tax
+    Decimal total
+    String notes
+    DateTime voidedAt
+    String voidedBy FK
+    String voidReason
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  SalesOrderItem {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String salesOrderId FK
+    String productId FK
+    String description
+    Decimal quantity
+    Decimal unitPrice
+    Decimal discount
+    Decimal tax
+    Decimal lineTotal
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  SalesInvoice {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String invoiceNumber
+    String customerId FK
+    String salesOrderId FK
+    DateTime invoiceDate
+    DateTime dueDate
+    InvoiceStatus status
+    String currencyCode FK
+    Decimal subtotal
+    Decimal discount
+    Decimal tax
+    Decimal total
+    String notes
+    DateTime voidedAt
+    String voidedBy FK
+    String voidReason
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  SalesInvoiceItem {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String salesInvoiceId FK
+    String productId FK
+    String description
+    Decimal quantity
+    Decimal unitPrice
+    Decimal discount
+    Decimal tax
+    Decimal lineTotal
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  SupplierPayment {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String supplierId FK
+    String paymentNumber
+    DateTime paymentDate
+    Decimal amount
+    String currencyCode FK
+    PaymentMethod paymentMethod
+    String referenceNumber
+    String notes
+    PaymentStatus status
+    DateTime voidedAt
+    String voidedBy FK
+    String voidReason
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  CustomerPayment {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String customerId FK
+    String paymentNumber
+    DateTime paymentDate
+    Decimal amount
+    String currencyCode FK
+    PaymentMethod paymentMethod
+    String referenceNumber
+    String notes
+    PaymentStatus status
+    DateTime voidedAt
+    String voidedBy FK
+    String voidReason
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  SupplierPaymentAllocation {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String supplierPaymentId FK
+    String supplierInvoiceId FK
+    String supplierId FK
+    Decimal amount
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  PaymentSchedule {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String salesInvoiceId FK
+    ScheduleType scheduleType
+    Int numberOfInstallments
+    Decimal scheduledAmount
+    DateTime startDate
+    ScheduleStatus status
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  PaymentInstallment {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String paymentScheduleId FK
+    String salesInvoiceId FK
+    Int installmentNumber
+    DateTime dueDate
+    Decimal amount
+    InstallmentStatus status
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  CustomerPaymentAllocation {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String customerPaymentId FK
+    String salesInvoiceId FK
+    String customerId FK
+    String paymentInstallmentId FK
+    Decimal amount
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  BillOfMaterial {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String productId FK
+    Int version
+    BillOfMaterialStatus status
+    DateTime effectiveFrom
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  BillOfMaterialItem {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String billOfMaterialId FK
+    String rawMaterialId FK
+    Decimal quantityRequired
+    Decimal wastagePercentage
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  ProductionOrder {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String productionNumber
+    String productId FK
+    String warehouseId FK
+    String billOfMaterialId FK
+    Decimal plannedQuantity
+    Decimal actualQuantity
+    DateTime plannedStartDate
+    DateTime plannedEndDate
+    DateTime actualStartDate
+    DateTime actualEndDate
+    ProductionOrderStatus status
+    String notes
+    DateTime voidedAt
+    String voidedBy FK
+    String voidReason
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  ProductionMaterialConsumption {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String productionOrderId FK
+    String rawMaterialId FK
+    Decimal plannedQuantity
+    Decimal actualQuantity
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  ProductionOutput {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String productionOrderId FK
+    String productId FK
+    Decimal quantityProduced
+    Decimal quantityRejected
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  Expense {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String expenseNumber
+    String categoryId FK
+    DateTime expenseDate
+    String description
+    Decimal amount
+    String currencyCode FK
+    PaymentMethod paymentMethod
+    String supplierId FK
+    String referenceNumber
+    String notes
+    ExpenseStatus status
+    DateTime voidedAt
+    String voidedBy FK
+    String voidReason
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  Dispatch {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String dispatchNumber
+    String salesOrderId FK
+    String customerId FK
+    String warehouseId FK
+    DateTime dispatchDate
+    String driverName
+    String vehicleNumber
+    String trackingReference
+    DispatchStatus status
+    String notes
+    DateTime voidedAt
+    String voidedBy FK
+    String voidReason
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  DispatchItem {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String dispatchId FK
+    String salesOrderId FK
+    String salesOrderItemId FK
+    String productId FK
+    Decimal quantity
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  InventoryMovement {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String warehouseId FK
+    InventoryItemType itemType
+    String rawMaterialId FK
+    String productId FK
+    InventoryMovementType movementType
+    Decimal quantity
+    Decimal unitCost
+    InventoryReferenceType referenceType
+    String referenceId
+    String reversalOfId FK
+    DateTime movementDate
+    String notes
+    String createdBy FK
+    DateTime createdAt
+  }
+  InventoryBalance {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String warehouseId FK
+    InventoryItemType itemType
+    String rawMaterialId FK
+    String productId FK
+    Decimal quantityOnHand
+    Decimal quantityReserved
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  StoredObject {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String bucket
+    String objectKey
+    String contentType
+    BigInt sizeBytes
+    DateTime createdAt
+    DateTime updatedAt
+    String createdBy FK
+    String updatedBy FK
+  }
+  Attachment {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String storedObjectId FK
+    AttachmentEntityType entityType
+    String entityId
+    String fileName
+    String uploadedBy FK
+    DateTime uploadedAt
+    DateTime deletedAt
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  AuditLog {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String userId FK
+    String entityType
+    String entityId
+    AuditAction action
+    Json oldValues
+    Json newValues
+    String ipAddress
+    String userAgent
+    DateTime createdAt
+  }
+  Notification {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String userId FK
+    NotificationType type
+    String title
+    String message
+    String entityType
+    String entityId
+    Boolean isRead
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  Tenant ||--o{ TenantBranding : "tenant"
+  Tenant ||--o{ Organization : "tenant"
+  Country ||--o{ Organization : "country"
+  Currency ||--o{ Organization : "currency"
+  Organization ||--o{ Role : "organization"
+  Role ||--o{ RolePermission : "role"
+  Permission ||--o{ RolePermission : "permission"
+  Organization ||--o{ RolePermission : "organization"
+  User ||--o{ Membership : "user"
+  Role ||--o{ Membership : "role"
+  Organization ||--o{ Membership : "organization"
+  Currency ||--o{ OrganizationSettings : "currency"
+  Organization ||--o| OrganizationSettings : "organization"
+  Membership |o--o{ OrganizationSettings : "createdByMember"
+  Membership |o--o{ OrganizationSettings : "updatedByMember"
+  Organization ||--o{ NumberSequence : "organization"
+  Membership |o--o{ NumberSequence : "createdByMember"
+  Membership |o--o{ NumberSequence : "updatedByMember"
+  UnitDefinition |o--o{ Unit : "definition"
+  Organization ||--o{ Unit : "organization"
+  Membership |o--o{ Unit : "createdByMember"
+  Membership |o--o{ Unit : "updatedByMember"
+  Currency ||--o{ Supplier : "currency"
+  Organization ||--o{ Supplier : "organization"
+  Membership |o--o{ Supplier : "createdByMember"
+  Membership |o--o{ Supplier : "updatedByMember"
+  Currency ||--o{ Customer : "currency"
+  Organization ||--o{ Customer : "organization"
+  Membership |o--o{ Customer : "createdByMember"
+  Membership |o--o{ Customer : "updatedByMember"
+  Unit ||--o{ RawMaterial : "unit"
+  Organization ||--o{ RawMaterial : "organization"
+  Membership |o--o{ RawMaterial : "createdByMember"
+  Membership |o--o{ RawMaterial : "updatedByMember"
+  Unit ||--o{ Product : "unit"
+  Organization ||--o{ Product : "organization"
+  Membership |o--o{ Product : "createdByMember"
+  Membership |o--o{ Product : "updatedByMember"
+  Organization ||--o{ Warehouse : "organization"
+  Membership |o--o{ Warehouse : "createdByMember"
+  Membership |o--o{ Warehouse : "updatedByMember"
+  Organization ||--o{ ExpenseCategory : "organization"
+  Membership |o--o{ ExpenseCategory : "createdByMember"
+  Membership |o--o{ ExpenseCategory : "updatedByMember"
+  Currency ||--o{ PurchaseOrder : "currency"
+  Supplier ||--o{ PurchaseOrder : "supplier"
+  Organization ||--o{ PurchaseOrder : "organization"
+  Membership |o--o{ PurchaseOrder : "createdByMember"
+  Membership |o--o{ PurchaseOrder : "updatedByMember"
+  Membership |o--o{ PurchaseOrder : "voidedByMember"
+  PurchaseOrder ||--o{ PurchaseOrderItem : "purchaseOrder"
+  RawMaterial ||--o{ PurchaseOrderItem : "rawMaterial"
+  Organization ||--o{ PurchaseOrderItem : "organization"
+  Membership |o--o{ PurchaseOrderItem : "createdByMember"
+  Membership |o--o{ PurchaseOrderItem : "updatedByMember"
+  PurchaseOrder |o--o{ GoodsReceipt : "purchaseOrder"
+  Supplier ||--o{ GoodsReceipt : "supplier"
+  Warehouse ||--o{ GoodsReceipt : "warehouse"
+  Organization ||--o{ GoodsReceipt : "organization"
+  Membership |o--o{ GoodsReceipt : "createdByMember"
+  Membership |o--o{ GoodsReceipt : "updatedByMember"
+  Membership |o--o{ GoodsReceipt : "voidedByMember"
+  GoodsReceipt |o--o{ GoodsReceiptItem : "goodsReceipt"
+  PurchaseOrderItem |o--o{ GoodsReceiptItem : "purchaseOrderItem"
+  RawMaterial ||--o{ GoodsReceiptItem : "rawMaterial"
+  GoodsReceipt ||--o{ GoodsReceiptItem : "receiptScope"
+  Organization ||--o{ GoodsReceiptItem : "organization"
+  Membership |o--o{ GoodsReceiptItem : "createdByMember"
+  Membership |o--o{ GoodsReceiptItem : "updatedByMember"
+  Currency ||--o{ SupplierInvoice : "currency"
+  Supplier ||--o{ SupplierInvoice : "supplier"
+  PurchaseOrder |o--o{ SupplierInvoice : "purchaseOrder"
+  Organization ||--o{ SupplierInvoice : "organization"
+  Membership |o--o{ SupplierInvoice : "createdByMember"
+  Membership |o--o{ SupplierInvoice : "updatedByMember"
+  Membership |o--o{ SupplierInvoice : "voidedByMember"
+  SupplierInvoice ||--o{ SupplierInvoiceItem : "supplierInvoice"
+  RawMaterial ||--o{ SupplierInvoiceItem : "rawMaterial"
+  Organization ||--o{ SupplierInvoiceItem : "organization"
+  Membership |o--o{ SupplierInvoiceItem : "createdByMember"
+  Membership |o--o{ SupplierInvoiceItem : "updatedByMember"
+  Currency ||--o{ SalesOrder : "currency"
+  Customer ||--o{ SalesOrder : "customer"
+  Organization ||--o{ SalesOrder : "organization"
+  Membership |o--o{ SalesOrder : "createdByMember"
+  Membership |o--o{ SalesOrder : "updatedByMember"
+  Membership |o--o{ SalesOrder : "voidedByMember"
+  SalesOrder ||--o{ SalesOrderItem : "salesOrder"
+  Product ||--o{ SalesOrderItem : "product"
+  Organization ||--o{ SalesOrderItem : "organization"
+  Membership |o--o{ SalesOrderItem : "createdByMember"
+  Membership |o--o{ SalesOrderItem : "updatedByMember"
+  Currency ||--o{ SalesInvoice : "currency"
+  Customer ||--o{ SalesInvoice : "customer"
+  SalesOrder |o--o{ SalesInvoice : "salesOrder"
+  Organization ||--o{ SalesInvoice : "organization"
+  Membership |o--o{ SalesInvoice : "createdByMember"
+  Membership |o--o{ SalesInvoice : "updatedByMember"
+  Membership |o--o{ SalesInvoice : "voidedByMember"
+  SalesInvoice ||--o{ SalesInvoiceItem : "salesInvoice"
+  Product ||--o{ SalesInvoiceItem : "product"
+  Organization ||--o{ SalesInvoiceItem : "organization"
+  Membership |o--o{ SalesInvoiceItem : "createdByMember"
+  Membership |o--o{ SalesInvoiceItem : "updatedByMember"
+  Supplier ||--o{ SupplierPayment : "supplier"
+  Currency ||--o{ SupplierPayment : "currency"
+  Organization ||--o{ SupplierPayment : "organization"
+  Membership |o--o{ SupplierPayment : "createdByMember"
+  Membership |o--o{ SupplierPayment : "updatedByMember"
+  Membership |o--o{ SupplierPayment : "voidedByMember"
+  Customer ||--o{ CustomerPayment : "customer"
+  Currency ||--o{ CustomerPayment : "currency"
+  Organization ||--o{ CustomerPayment : "organization"
+  Membership |o--o{ CustomerPayment : "createdByMember"
+  Membership |o--o{ CustomerPayment : "updatedByMember"
+  Membership |o--o{ CustomerPayment : "voidedByMember"
+  SupplierPayment ||--o{ SupplierPaymentAllocation : "supplierPayment"
+  SupplierInvoice ||--o{ SupplierPaymentAllocation : "supplierInvoice"
+  Organization ||--o{ SupplierPaymentAllocation : "organization"
+  Membership |o--o{ SupplierPaymentAllocation : "createdByMember"
+  Membership |o--o{ SupplierPaymentAllocation : "updatedByMember"
+  SalesInvoice ||--o{ PaymentSchedule : "salesInvoice"
+  Organization ||--o{ PaymentSchedule : "organization"
+  Membership |o--o{ PaymentSchedule : "createdByMember"
+  Membership |o--o{ PaymentSchedule : "updatedByMember"
+  PaymentSchedule ||--o{ PaymentInstallment : "paymentSchedule"
+  Organization ||--o{ PaymentInstallment : "organization"
+  Membership |o--o{ PaymentInstallment : "createdByMember"
+  Membership |o--o{ PaymentInstallment : "updatedByMember"
+  CustomerPayment ||--o{ CustomerPaymentAllocation : "customerPayment"
+  SalesInvoice ||--o{ CustomerPaymentAllocation : "salesInvoice"
+  PaymentInstallment |o--o{ CustomerPaymentAllocation : "paymentInstallment"
+  Organization ||--o{ CustomerPaymentAllocation : "organization"
+  Membership |o--o{ CustomerPaymentAllocation : "createdByMember"
+  Membership |o--o{ CustomerPaymentAllocation : "updatedByMember"
+  Product ||--o{ BillOfMaterial : "product"
+  Organization ||--o{ BillOfMaterial : "organization"
+  Membership |o--o{ BillOfMaterial : "createdByMember"
+  Membership |o--o{ BillOfMaterial : "updatedByMember"
+  BillOfMaterial ||--o{ BillOfMaterialItem : "billOfMaterial"
+  RawMaterial ||--o{ BillOfMaterialItem : "rawMaterial"
+  Organization ||--o{ BillOfMaterialItem : "organization"
+  Membership |o--o{ BillOfMaterialItem : "createdByMember"
+  Membership |o--o{ BillOfMaterialItem : "updatedByMember"
+  Product ||--o{ ProductionOrder : "product"
+  Warehouse ||--o{ ProductionOrder : "warehouse"
+  BillOfMaterial |o--o{ ProductionOrder : "billOfMaterial"
+  Organization ||--o{ ProductionOrder : "organization"
+  Membership |o--o{ ProductionOrder : "createdByMember"
+  Membership |o--o{ ProductionOrder : "updatedByMember"
+  Membership |o--o{ ProductionOrder : "voidedByMember"
+  ProductionOrder ||--o{ ProductionMaterialConsumption : "productionOrder"
+  RawMaterial ||--o{ ProductionMaterialConsumption : "rawMaterial"
+  Organization ||--o{ ProductionMaterialConsumption : "organization"
+  Membership |o--o{ ProductionMaterialConsumption : "createdByMember"
+  Membership |o--o{ ProductionMaterialConsumption : "updatedByMember"
+  ProductionOrder ||--o{ ProductionOutput : "productionOrder"
+  Product ||--o{ ProductionOutput : "product"
+  Organization ||--o{ ProductionOutput : "organization"
+  Membership |o--o{ ProductionOutput : "createdByMember"
+  Membership |o--o{ ProductionOutput : "updatedByMember"
+  ExpenseCategory ||--o{ Expense : "category"
+  Supplier |o--o{ Expense : "supplier"
+  Currency ||--o{ Expense : "currency"
+  Organization ||--o{ Expense : "organization"
+  Membership |o--o{ Expense : "createdByMember"
+  Membership |o--o{ Expense : "updatedByMember"
+  Membership |o--o{ Expense : "voidedByMember"
+  SalesOrder ||--o{ Dispatch : "salesOrder"
+  Customer ||--o{ Dispatch : "customer"
+  Warehouse ||--o{ Dispatch : "warehouse"
+  Organization ||--o{ Dispatch : "organization"
+  Membership |o--o{ Dispatch : "createdByMember"
+  Membership |o--o{ Dispatch : "updatedByMember"
+  Membership |o--o{ Dispatch : "voidedByMember"
+  Dispatch ||--o{ DispatchItem : "dispatch"
+  SalesOrderItem ||--o{ DispatchItem : "salesOrderItem"
+  Product ||--o{ DispatchItem : "product"
+  Organization ||--o{ DispatchItem : "organization"
+  Membership |o--o{ DispatchItem : "createdByMember"
+  Membership |o--o{ DispatchItem : "updatedByMember"
+  Warehouse ||--o{ InventoryMovement : "warehouse"
+  RawMaterial |o--o{ InventoryMovement : "rawMaterial"
+  Product |o--o{ InventoryMovement : "product"
+  InventoryMovement |o--o| InventoryMovement : "reversalOf"
+  Organization ||--o{ InventoryMovement : "organization"
+  Membership |o--o{ InventoryMovement : "createdByMember"
+  Warehouse ||--o{ InventoryBalance : "warehouse"
+  RawMaterial |o--o{ InventoryBalance : "rawMaterial"
+  Product |o--o{ InventoryBalance : "product"
+  Organization ||--o{ InventoryBalance : "organization"
+  Organization ||--o{ StoredObject : "organization"
+  Membership |o--o{ StoredObject : "createdByMember"
+  Membership |o--o{ StoredObject : "updatedByMember"
+  StoredObject ||--o| Attachment : "storedObject"
+  Membership ||--o{ Attachment : "uploader"
+  Organization ||--o{ Attachment : "organization"
+  Membership |o--o{ AuditLog : "actor"
+  Organization ||--o{ AuditLog : "organization"
+  Membership ||--o{ Notification : "recipient"
+  Organization ||--o{ Notification : "organization"

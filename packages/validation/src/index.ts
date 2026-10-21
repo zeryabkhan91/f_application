@@ -27,3 +27,4 @@ export const errorResponseSchema = z.object({
 
 // Re-export one Zod instance so schemas stay consistent across workspaces.
 export { z };
+export * from './domain.js';

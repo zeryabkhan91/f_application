@@ -24,7 +24,16 @@ JSON logs to stdout for CloudWatch and drains HTTP requests on SIGTERM.
 
 ## Runtime settings
 
-Provide `DATABASE_URL` through AWS Secrets Manager. Use RDS PostgreSQL, encryption
+Provide a restricted `DATABASE_URL` through AWS Secrets Manager. It must not own
+tables or have superuser/BYPASSRLS privileges. Configure a separate
+`MIGRATION_DATABASE_URL` secret for migration and catalog-seed jobs; keep it out
+of API tasks. The migration role must be able to install CITEXT. Provision runtime
+table grants after migrations using reviewed infrastructure; the local
+`db:provision` command refuses remote/production databases. New organizations need
+the reference catalogs (`npm run db:seed`) before administrative bootstrap.
+See `docs/architecture/database.md` for scope policies and grant strategy.
+
+Use RDS PostgreSQL, encryption
 at rest, private networking, backups, and verified TLS using the current AWS RDS
 CA trust configuration. Do not disable certificate validation. Supply
 `CORS_ORIGINS=https://your-frontend-domain`, `AWS_REGION`, and `S3_BUCKET` as task

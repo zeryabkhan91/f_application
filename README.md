@@ -1,124 +1,139 @@
-# F Application backend
+# Factory Management System backend
 
-TypeScript monorepo for the system backend: Node.js 24, Express 5, Zod,
-PostgreSQL 17, Prisma 7, OpenAPI, and AWS S3. npm workspaces link shared packages.
-This is the backend foundation; product-specific routes, authentication, and
-authorization require the system's business requirements.
+Backend foundation for the factory-system blueprint: Node.js 24, TypeScript,
+Express 5, Zod, PostgreSQL 17, Prisma 7, OpenAPI, and AWS S3. npm workspaces link
+shared backend packages. **No frontend is implemented.**
+
+The complete uploaded plan is saved in [docs/plans/implementation-plan.md](docs/plans/implementation-plan.md).
+Read [project context and Task #1 scope](docs/CONTEXT.md),
+[architecture/database decisions](docs/architecture/database.md), and the
+[ERD](docs/architecture/erd.md) before adding modules. The database covers all core
+factory domains; business APIs, authentication flows, and posting engines are later tasks.
 
 ## Quick start
 
-Prerequisites: Node **24.19.0**, npm **11**, Docker Engine and Docker Compose v2.
-The cloud environment already has Node and Docker.
+Prerequisites: Node **24.19.0**, npm **11**, Docker Engine, and Docker Compose v2.
 
 ```sh
 npm ci
 npm run setup:local
 npm run db:up
 npm run db:deploy
+npm run db:provision
 npm run build
+npm run db:seed
+# Optional development master data:
+npm run db:seed:demo
 npm run dev
 ```
 
-`setup:local` creates an ignored `.env` with a random local database password and
-leaves an existing `.env` unchanged. Database data persists in a Docker volume;
-`npm run db:down` stops PostgreSQL without removing data. Keep the password in
-`.env` consistent with the existing volume. Edit `.env` for an external database.
-Docker Compose is for local PostgreSQL only.
+`setup:local` creates an ignored `.env` with a generated local PostgreSQL password
+and leaves an existing file unchanged. `db:provision` upgrades local configuration
+to separate administrative `MIGRATION_DATABASE_URL` and restricted runtime
+`DATABASE_URL` bindings. It preserves a private ignored `.env.before-tenancy`
+backup, retains the password on repeat runs, and refuses remote/production
+servers. PostgreSQL data persists in a Docker volume. `npm run db:down` stops it
+without deleting data. Keep the configured password consistent with that volume.
 
-The API uses port 4000. Available paths:
+`db:seed` creates reference catalogs. `db:seed:demo` also creates Demo Factory,
+its invited owner, default roles/settings/warehouse/units/sequences, expense
+categories, ABC Raw Materials, XYZ Traders, Cotton, and Finished Fabric.
+Seeds preserve existing values and counters; no fixed tenant IDs or usable demo
+password are stored. Login/registration is a later task.
 
-| Path                | Purpose                                                          |
-| ------------------- | ---------------------------------------------------------------- |
-| `GET /health/live`  | Process liveness                                                 |
-| `GET /health/ready` | Runs a real PostgreSQL query; returns 503 on failure or shutdown |
-| `GET /api/v1`       | Service identity and version                                     |
-| `GET /openapi.json` | Generated OpenAPI contract in development                        |
-| `GET /docs/`        | Swagger UI in development                                        |
+## API runtime
 
-Local verification: `curl --fail http://127.0.0.1:4000/health/ready` and
-`curl --fail http://127.0.0.1:4000/api/v1`. Documentation routes default to off in
-production; set `ENABLE_API_DOCS=true` explicitly if required.
+The API uses port 4000. Existing routes remain:
 
-`npm run smoke` checks the live API and database readiness. In the Codex cloud
-workspace, `bash scripts/cloud-install.sh` repeats dependency installation,
-local database startup, migrations, and compilation. Each cloud task is already
-isolated; use its existing checkout without creating a Git worktree.
+| Path                | Purpose                                         |
+| ------------------- | ----------------------------------------------- |
+| `GET /health/live`  | Process liveness                                |
+| `GET /health/ready` | Real database query; 503 on failure or shutdown |
+| `GET /api/v1`       | Service identity and version                    |
+| `GET /openapi.json` | Development OpenAPI contract                    |
+| `GET /docs/`        | Development Swagger UI                          |
+
+Run `npm run smoke` against a running API. Set `API_BASE_URL` to test a different
+local port. Docs default to disabled in production. Set `ENABLE_API_DOCS=true`
+explicitly if needed. No business endpoints accept unverified tenant/user IDs.
 
 ## Layout
 
 ```text
 apps/
-  api/          Express API, middleware, S3 service, tests, Dockerfile
-  web/          Reserved for Next.js frontend
+  api/          HTTP runtime, middleware, S3 helper, tests, Dockerfile
+  web/          Existing placeholder; frontend deferred
 packages/
-  db/           Prisma schema, migrations, generated client factory
-  types/        Shared DTOs derived from Zod schemas
-  validation/   Shared request/response schemas and enums
-  ui/           Reserved for reusable frontend components
-  config/       Validated environment and shared TypeScript settings
+  db/           50 models, migrations, tenancy, sequences, reference/demo seeds
+  types/        Shared DTO/context/permission types
+  validation/   Shared Zod contracts and 26 domain enums
+  ui/           Existing placeholder; frontend deferred
+  config/       Environment validation and TypeScript configuration
   utils/        Shared backend utilities
 docs/
-  openapi.json  Generated and checked-in API specification
+  CONTEXT.md    Accepted scope and implementation decisions
+  plans/        Original user-supplied blueprint
+  architecture/ Database decisions, domain ERD, full generated ERD
+  openapi.json Existing API contract
 ```
-
-Frontend dependencies are deferred until `apps/web` is implemented. Its planned
-stack is Next.js, TypeScript, Tailwind, PWA support, React Hook Form, Zod, and
-TanStack Query. API modules belong in `apps/api`; shared DTOs, enums, and schemas
-belong in `packages`. Add a Zod schema, request validator, response validator,
-OpenAPI registration, and tests with each business endpoint.
 
 ## Development commands
 
-| Command                    | Purpose                                                          |
-| -------------------------- | ---------------------------------------------------------------- |
-| `npm run dev`              | Initial build, shared-package compilation watch, API reload      |
-| `npm run build`            | Generate Prisma client and compile all backend packages          |
-| `npm start`                | Run compiled API; run `build` first                              |
-| `npm run typecheck`        | Check TypeScript project references                              |
-| `npm run lint`             | ESLint                                                           |
-| `npm test`                 | Unit and HTTP tests, including validation and offline S3 signing |
-| `npm run test:integration` | Real PostgreSQL/Prisma round-trip and constraint checks          |
-| `npm run db:migrate`       | Create and apply a development migration                         |
-| `npm run db:deploy`        | Apply checked-in migrations without resetting data               |
-| `npm run db:studio`        | Inspect the local database                                       |
-| `npm run openapi:generate` | Refresh `docs/openapi.json`                                      |
-| `npm run format:check`     | Check formatting                                                 |
+| Command                    | Purpose                                                      |
+| -------------------------- | ------------------------------------------------------------ |
+| `npm run dev`              | Initial build, shared-package watcher, API reload            |
+| `npm run build`            | Generate Prisma client and compile backend packages          |
+| `npm start`                | Run the compiled API                                         |
+| `npm run typecheck`        | Validate TypeScript project references                       |
+| `npm run lint`             | ESLint                                                       |
+| `npm test`                 | Unit/HTTP, shared contracts, and enum consistency tests      |
+| `npm run test:integration` | Fresh migrations, real PostgreSQL isolation/integrity tests  |
+| `npm run db:validate`      | Validate the Prisma schema                                   |
+| `npm run db:deploy`        | Apply checked-in migrations using administrative credentials |
+| `npm run db:provision`     | Provision the restricted local runtime role                  |
+| `npm run db:seed`          | Seed platform reference data                                 |
+| `npm run db:seed:demo`     | Opt-in development organization and master data              |
+| `npm run db:studio`        | Inspect database data with configured administrative access  |
+| `npm run erd:generate`     | Regenerate the complete schema ERD                           |
+| `npm run openapi:generate` | Refresh the existing API contract                            |
+| `npm run format:check`     | Check formatting                                             |
 
-Create new migrations from the repository root with
+Create migrations with
 `npm run migrate:dev --workspace=@repo/db -- --name your_change`.
-Never run migration reset against shared or production databases. Integration tests
-use `TEST_DATABASE_URL` when set, otherwise `DATABASE_URL`; they create and remove
-their own uniquely named test row and never reset the database. The initial
-`StoredObject` model holds private document metadata; it is not exposed as a
-public upload API. Prisma's `BigInt` size must be serialized explicitly when a
-document DTO is added.
+Never edit applied migrations or reset a shared database. Integration tests use
+`TEST_MIGRATION_DATABASE_URL`, falling back to `MIGRATION_DATABASE_URL`, and require
+a local administrator with CREATEDB/CREATEROLE/CITEXT rights. They create and drop
+only their own random temporary database/role; they never reset the configured
+local database. CI exercises the same workflow and checks ERD/OpenAPI drift.
 
-## Configuration and storage
+In the Codex cloud workspace, `bash scripts/cloud-install.sh` repeats installation,
+migrations, local role provisioning, compilation, and catalog seeding. Use the
+existing isolated checkout without creating a Git worktree.
 
-See `.env.example` and `packages/config/src/index.ts`. Required at runtime:
-`DATABASE_URL`; production also requires explicit `CORS_ORIGINS`. Values are
-validated at startup, and validation errors report variable names only.
-`TRUST_PROXY_HOPS=0` is the local default. For a single trusted AWS ALB, use `1`
-and restrict API ingress to the ALB security group so clients cannot bypass it.
+## Tenancy and financial data
 
-S3 is optional for the initial API. To use the internal storage service, configure
-`AWS_REGION` and `S3_BUCKET`, create a client with `createS3Client`, and pass it to
-`createObjectStorage`. AWS SDK uses its standard credential chain; prefer ECS task
-roles in AWS. Do not commit AWS access keys. Optional `S3_ENDPOINT` and
-`S3_FORCE_PATH_STYLE` support compatible local storage.
+Use `withOrganization` with authenticated server identity, then `requirePermission`
+inside the transaction. The helper verifies active memberships and rejects
+privileged connections; forced PostgreSQL RLS provides scope isolation. Tenant and
+organization foreign keys also prevent cross-scope relationships. Money/quantity
+contracts use decimal strings. Financial balances and stock availability are
+read models; audit and stock history are append-only. Full rules and remaining
+transactional workflow responsibilities are in the architecture document.
 
-The helper signs short-lived private upload/download URLs and deletes objects.
-Uploads return `{ url, headers }`; send all returned headers with the upload body.
-Authorize ownership and generate scoped object keys before calling it. Signed
-uploads request S3-managed encryption; keep S3 Block Public Access enabled and
-configure bucket CORS for your frontend origins. Upload size and document type
-policy must be enforced by the future document workflow; signing alone does not
-enforce a file-size limit. Real AWS storage operations need a bucket and IAM
-permissions and are not part of offline tests.
+## Storage and deployment
 
-## AWS deployment
+S3 remains optional for the initial API. Configure `AWS_REGION` and `S3_BUCKET`,
+create the client with `createS3Client`, and pass it to `createObjectStorage`.
+Use ECS task roles or the AWS standard credential chain. Keep buckets private and
+Block Public Access enabled; do not commit access keys. The helper returns upload
+`{ url, headers }`; send every returned header with the body. Authorize ownership,
+generate organization-scoped keys, and enforce document size/type policy in the
+future attachment workflow. Signed URLs alone do not enforce upload size limits.
+Live AWS operations need a real bucket and permissions and are not offline tests.
 
-See [deployment notes](docs/deployment.md). The Dockerfile includes API runtime
-and separate migration targets. Deployment infrastructure is not provisioned by
-this scaffold. The repository includes CI for build, lint, format, tests,
-migrations, and OpenAPI drift.
+Runtime configuration is in `.env.example` and `packages/config/src/index.ts`.
+Production needs a restricted `DATABASE_URL` and explicit `CORS_ORIGINS`. Set
+`TRUST_PROXY_HOPS=1` only for a single trusted ALB with ingress restricted to it.
+Keep administrative migration/seed credentials out of API tasks.
+[Deployment notes](docs/deployment.md) cover Docker/ECS/RDS/S3; no AWS infrastructure
+or frontend deployment is provisioned by this task.

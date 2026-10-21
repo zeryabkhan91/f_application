@@ -1,3 +1,5 @@
+// Factory Management System database foundation.
+// See docs/architecture/database.md for ownership, constraints, and RLS rules.
 generator client {
   provider            = "prisma-client"
   output              = "../src/generated/prisma"
@@ -9,16 +11,1808 @@ datasource db {
   provider = "postgresql"
 }
 
-// Private S3 object metadata. Business entities and ownership belong in later migrations.
-model StoredObject {
-  id          String   @id @default(uuid()) @db.Uuid
-  bucket      String   @db.VarChar(63)
-  objectKey   String   @map("object_key") @db.VarChar(1024)
-  contentType String   @map("content_type") @db.VarChar(255)
-  sizeBytes   BigInt   @map("size_bytes")
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum RoleCode {
+  OWNER
+  ADMIN
+  ACCOUNTS
+  SALES
+  PRODUCTION
+  WAREHOUSE
+  VIEWER
+  CUSTOM
+}
+
+enum NumberSequenceType {
+  INVOICE
+  ORDER
+  PURCHASE
+  PAYMENT
+  SUPPLIER_PAYMENT
+  SUPPLIER_INVOICE
+  GOODS_RECEIPT
+  PRODUCTION
+  DISPATCH
+  EXPENSE
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  CONFIRMED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum GoodsReceiptStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum PaymentStatus {
+  DRAFT
+  POSTED
+  VOID
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  OTHER
+}
+
+enum SalesOrderStatus {
+  DRAFT
+  CONFIRMED
+  IN_PRODUCTION
+  READY
+  PARTIALLY_DISPATCHED
+  DISPATCHED
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+enum ScheduleType {
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum ScheduleStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum InstallmentStatus {
+  UPCOMING
+  DUE
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+}
+
+enum InventoryItemType {
+  RAW_MATERIAL
+  PRODUCT
+}
+
+enum InventoryMovementType {
+  PURCHASE_RECEIPT
+  PRODUCTION_CONSUMPTION
+  PRODUCTION_OUTPUT
+  SALE_DISPATCH
+  RETURN_IN
+  RETURN_OUT
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+enum InventoryReferenceType {
+  GOODS_RECEIPT
+  PRODUCTION_ORDER
+  DISPATCH
+  ADJUSTMENT
+  RETURN
+  TRANSFER
+}
+
+enum BillOfMaterialStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum ProductionOrderStatus {
+  DRAFT
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum DispatchStatus {
+  DRAFT
+  POSTED
+  DELIVERED
+  CANCELLED
+}
+
+enum ExpenseStatus {
+  DRAFT
+  POSTED
+  VOID
+}
+
+enum AttachmentEntityType {
+  SUPPLIER
+  CUSTOMER
+  RAW_MATERIAL
+  PRODUCT
+  PURCHASE_ORDER
+  SUPPLIER_INVOICE
+  SUPPLIER_PAYMENT
+  SALES_ORDER
+  SALES_INVOICE
+  CUSTOMER_PAYMENT
+  DISPATCH
+  PRODUCTION_ORDER
+  EXPENSE
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  VOID
+  CANCEL
+  PAYMENT
+  STATUS_CHANGE
+  DELETE_MASTER_RECORD
+  REVERSE
+}
+
+enum NotificationType {
+  CUSTOMER_PAYMENT_OVERDUE
+  SUPPLIER_PAYMENT_DUE
+  CUSTOMER_INSTALLMENT_DUE
+  LOW_RAW_MATERIAL_STOCK
+  ORDER_DELIVERY_APPROACHING
+}
+
+model User {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String     @db.VarChar(160)
+  email        String     @unique @db.Citext
+  passwordHash String?    @map("password_hash")
+  status       UserStatus @default(INVITED)
+  lastLoginAt  DateTime?  @map("last_login_at") @db.Timestamptz(3)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  memberships Membership[] @relation("Membership_user")
+
+  @@map("users")
+}
+
+model Tenant {
+  id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String       @db.VarChar(200)
+  slug      String       @unique @db.Citext
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  branding      TenantBranding? @relation("TenantBranding_tenant")
+  organizations Organization[]  @relation("Organization_tenant")
+
+  @@map("tenants")
+}
+
+model TenantBranding {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @unique @map("tenant_id") @db.Uuid
+  applicationName String?  @map("application_name") @db.VarChar(160)
+  logoUrl         String?  @map("logo_url")
+  faviconUrl      String?  @map("favicon_url")
+  primaryTheme    Json?    @map("primary_theme") @db.JsonB
+  customDomain    String?  @unique @map("custom_domain") @db.Citext
+  supportEmail    String?  @map("support_email") @db.Citext
+  invoiceBranding Json?    @map("invoice_branding") @db.JsonB
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant Tenant @relation("TenantBranding_tenant", fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "tenant_branding_tenant_fkey")
+
+  @@map("tenant_branding")
+}
+
+model Currency {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code      String   @unique @db.Char(3)
+  name      String   @db.VarChar(100)
+  symbol    String   @db.VarChar(10)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organizations            Organization[]         @relation("Organization_currency")
+  settings                 OrganizationSettings[] @relation("OrganizationSettings_currency")
+  supplier_currency        Supplier[]             @relation("Supplier_currency")
+  customer_currency        Customer[]             @relation("Customer_currency")
+  purchaseOrder_currency   PurchaseOrder[]        @relation("PurchaseOrder_currency")
+  supplierInvoice_currency SupplierInvoice[]      @relation("SupplierInvoice_currency")
+  salesOrder_currency      SalesOrder[]           @relation("SalesOrder_currency")
+  salesInvoice_currency    SalesInvoice[]         @relation("SalesInvoice_currency")
+  supplierPayment_currency SupplierPayment[]      @relation("SupplierPayment_currency")
+  customerPayment_currency CustomerPayment[]      @relation("CustomerPayment_currency")
+  expense_currency         Expense[]              @relation("Expense_currency")
+
+  @@map("currencies")
+}
+
+model Country {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code      String   @unique @db.Char(2)
+  name      String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organizations Organization[] @relation("Organization_country")
+
+  @@map("countries")
+}
+
+model UnitDefinition {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code      String   @unique @db.VarChar(20)
+  name      String   @db.VarChar(100)
+  symbol    String   @db.VarChar(20)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organizationUnits Unit[] @relation("Unit_definition")
+
+  @@map("unit_definitions")
+}
+
+model Permission {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String   @unique @db.VarChar(100)
+  description String   @db.VarChar(255)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  @@unique([bucket, objectKey])
+  roles RolePermission[] @relation("RolePermission_permission")
+
+  @@map("permissions")
+}
+
+model Organization {
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String             @map("tenant_id") @db.Uuid
+  name         String             @db.VarChar(200)
+  slug         String             @db.Citext
+  legalName    String?            @map("legal_name") @db.VarChar(200)
+  phone        String?            @db.VarChar(40)
+  email        String?            @db.Citext
+  address      String?
+  city         String?            @db.VarChar(100)
+  countryCode  String             @default("PK") @map("country_code") @db.Char(2)
+  currencyCode String             @default("PKR") @map("currency_code") @db.Char(3)
+  timezone     String             @default("Asia/Karachi") @db.VarChar(80)
+  taxNumber    String?            @map("tax_number") @db.VarChar(100)
+  status       OrganizationStatus @default(ACTIVE)
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant                                     Tenant                          @relation("Organization_tenant", fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "organizations_tenant_fkey")
+  country                                    Country                         @relation("Organization_country", fields: [countryCode], references: [code], onDelete: Restrict, onUpdate: Restrict, map: "organizations_country_fkey")
+  currency                                   Currency                        @relation("Organization_currency", fields: [currencyCode], references: [code], onDelete: Restrict, onUpdate: Restrict, map: "organizations_currency_fkey")
+  role_organization                          Role[]                          @relation("Role_organization")
+  rolePermission_organization                RolePermission[]                @relation("RolePermission_organization")
+  membership_organization                    Membership[]                    @relation("Membership_organization")
+  organizationSettings_organization          OrganizationSettings?           @relation("OrganizationSettings_organization")
+  numberSequence_organization                NumberSequence[]                @relation("NumberSequence_organization")
+  unit_organization                          Unit[]                          @relation("Unit_organization")
+  supplier_organization                      Supplier[]                      @relation("Supplier_organization")
+  customer_organization                      Customer[]                      @relation("Customer_organization")
+  rawMaterial_organization                   RawMaterial[]                   @relation("RawMaterial_organization")
+  product_organization                       Product[]                       @relation("Product_organization")
+  warehouse_organization                     Warehouse[]                     @relation("Warehouse_organization")
+  expenseCategory_organization               ExpenseCategory[]               @relation("ExpenseCategory_organization")
+  purchaseOrder_organization                 PurchaseOrder[]                 @relation("PurchaseOrder_organization")
+  purchaseOrderItem_organization             PurchaseOrderItem[]             @relation("PurchaseOrderItem_organization")
+  goodsReceipt_organization                  GoodsReceipt[]                  @relation("GoodsReceipt_organization")
+  goodsReceiptItem_organization              GoodsReceiptItem[]              @relation("GoodsReceiptItem_organization")
+  supplierInvoice_organization               SupplierInvoice[]               @relation("SupplierInvoice_organization")
+  supplierInvoiceItem_organization           SupplierInvoiceItem[]           @relation("SupplierInvoiceItem_organization")
+  salesOrder_organization                    SalesOrder[]                    @relation("SalesOrder_organization")
+  salesOrderItem_organization                SalesOrderItem[]                @relation("SalesOrderItem_organization")
+  salesInvoice_organization                  SalesInvoice[]                  @relation("SalesInvoice_organization")
+  salesInvoiceItem_organization              SalesInvoiceItem[]              @relation("SalesInvoiceItem_organization")
+  supplierPayment_organization               SupplierPayment[]               @relation("SupplierPayment_organization")
+  customerPayment_organization               CustomerPayment[]               @relation("CustomerPayment_organization")
+  supplierPaymentAllocation_organization     SupplierPaymentAllocation[]     @relation("SupplierPaymentAllocation_organization")
+  paymentSchedule_organization               PaymentSchedule[]               @relation("PaymentSchedule_organization")
+  paymentInstallment_organization            PaymentInstallment[]            @relation("PaymentInstallment_organization")
+  customerPaymentAllocation_organization     CustomerPaymentAllocation[]     @relation("CustomerPaymentAllocation_organization")
+  billOfMaterial_organization                BillOfMaterial[]                @relation("BillOfMaterial_organization")
+  billOfMaterialItem_organization            BillOfMaterialItem[]            @relation("BillOfMaterialItem_organization")
+  productionOrder_organization               ProductionOrder[]               @relation("ProductionOrder_organization")
+  productionMaterialConsumption_organization ProductionMaterialConsumption[] @relation("ProductionMaterialConsumption_organization")
+  productionOutput_organization              ProductionOutput[]              @relation("ProductionOutput_organization")
+  expense_organization                       Expense[]                       @relation("Expense_organization")
+  dispatch_organization                      Dispatch[]                      @relation("Dispatch_organization")
+  dispatchItem_organization                  DispatchItem[]                  @relation("DispatchItem_organization")
+  inventoryMovement_organization             InventoryMovement[]             @relation("InventoryMovement_organization")
+  inventoryBalance_organization              InventoryBalance[]              @relation("InventoryBalance_organization")
+  storedObject_organization                  StoredObject[]                  @relation("StoredObject_organization")
+  attachment_organization                    Attachment[]                    @relation("Attachment_organization")
+  auditLog_organization                      AuditLog[]                      @relation("AuditLog_organization")
+  notification_organization                  Notification[]                  @relation("Notification_organization")
+
+  @@unique([tenantId, id], map: "organizations_tenant_id_id_key")
+  @@unique([tenantId, slug], map: "organizations_tenant_id_slug_key")
+  @@map("organizations")
+}
+
+model Role {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String       @map("tenant_id") @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  code           RoleCode
+  name           String       @db.VarChar(100)
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  rolePermission_role RolePermission[] @relation("RolePermission_role")
+  membership_role     Membership[]     @relation("Membership_role")
+  organization        Organization     @relation("Role_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "roles_organization_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "roles_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, name], map: "roles_tenant_id_organization_id_name_key")
+  @@index([organizationId], map: "roles_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "roles_tenant_id_organization_id_created_at_idx")
+  @@map("roles")
+}
+
+model RolePermission {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  roleId         String   @map("role_id") @db.Uuid
+  permissionId   String   @map("permission_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  role         Role         @relation("RolePermission_role", fields: [tenantId, organizationId, roleId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "role_permissions_role_fkey")
+  permission   Permission   @relation("RolePermission_permission", fields: [permissionId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "role_permissions_permission_fkey")
+  organization Organization @relation("RolePermission_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "role_permissions_organization_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "role_permissions_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, roleId, permissionId], map: "role_permissions_tenant_id_organization_id_role_id_per_1788d5be")
+  @@index([organizationId], map: "role_permissions_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "role_permissions_tenant_id_organization_id_created_at_idx")
+  @@map("role_permissions")
+}
+
+model Membership {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String           @map("tenant_id") @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  roleId         String           @map("role_id") @db.Uuid
+  status         MembershipStatus @default(ACTIVE)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user                                          User                            @relation("Membership_user", fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "memberships_user_fkey")
+  role                                          Role                            @relation("Membership_role", fields: [tenantId, organizationId, roleId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "memberships_role_fkey")
+  attachment_uploader                           Attachment[]                    @relation("Attachment_uploader")
+  auditLog_actor                                AuditLog[]                      @relation("AuditLog_actor")
+  notification_recipient                        Notification[]                  @relation("Notification_recipient")
+  organization                                  Organization                    @relation("Membership_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "memberships_organization_fkey")
+  organizationSettings_createdByMember          OrganizationSettings[]          @relation("OrganizationSettings_createdByMember")
+  organizationSettings_updatedByMember          OrganizationSettings[]          @relation("OrganizationSettings_updatedByMember")
+  numberSequence_createdByMember                NumberSequence[]                @relation("NumberSequence_createdByMember")
+  numberSequence_updatedByMember                NumberSequence[]                @relation("NumberSequence_updatedByMember")
+  unit_createdByMember                          Unit[]                          @relation("Unit_createdByMember")
+  unit_updatedByMember                          Unit[]                          @relation("Unit_updatedByMember")
+  supplier_createdByMember                      Supplier[]                      @relation("Supplier_createdByMember")
+  supplier_updatedByMember                      Supplier[]                      @relation("Supplier_updatedByMember")
+  customer_createdByMember                      Customer[]                      @relation("Customer_createdByMember")
+  customer_updatedByMember                      Customer[]                      @relation("Customer_updatedByMember")
+  rawMaterial_createdByMember                   RawMaterial[]                   @relation("RawMaterial_createdByMember")
+  rawMaterial_updatedByMember                   RawMaterial[]                   @relation("RawMaterial_updatedByMember")
+  product_createdByMember                       Product[]                       @relation("Product_createdByMember")
+  product_updatedByMember                       Product[]                       @relation("Product_updatedByMember")
+  warehouse_createdByMember                     Warehouse[]                     @relation("Warehouse_createdByMember")
+  warehouse_updatedByMember                     Warehouse[]                     @relation("Warehouse_updatedByMember")
+  expenseCategory_createdByMember               ExpenseCategory[]               @relation("ExpenseCategory_createdByMember")
+  expenseCategory_updatedByMember               ExpenseCategory[]               @relation("ExpenseCategory_updatedByMember")
+  purchaseOrder_createdByMember                 PurchaseOrder[]                 @relation("PurchaseOrder_createdByMember")
+  purchaseOrder_updatedByMember                 PurchaseOrder[]                 @relation("PurchaseOrder_updatedByMember")
+  purchaseOrder_voidedByMember                  PurchaseOrder[]                 @relation("PurchaseOrder_voidedByMember")
+  purchaseOrderItem_createdByMember             PurchaseOrderItem[]             @relation("PurchaseOrderItem_createdByMember")
+  purchaseOrderItem_updatedByMember             PurchaseOrderItem[]             @relation("PurchaseOrderItem_updatedByMember")
+  goodsReceipt_createdByMember                  GoodsReceipt[]                  @relation("GoodsReceipt_createdByMember")
+  goodsReceipt_updatedByMember                  GoodsReceipt[]                  @relation("GoodsReceipt_updatedByMember")
+  goodsReceipt_voidedByMember                   GoodsReceipt[]                  @relation("GoodsReceipt_voidedByMember")
+  goodsReceiptItem_createdByMember              GoodsReceiptItem[]              @relation("GoodsReceiptItem_createdByMember")
+  goodsReceiptItem_updatedByMember              GoodsReceiptItem[]              @relation("GoodsReceiptItem_updatedByMember")
+  supplierInvoice_createdByMember               SupplierInvoice[]               @relation("SupplierInvoice_createdByMember")
+  supplierInvoice_updatedByMember               SupplierInvoice[]               @relation("SupplierInvoice_updatedByMember")
+  supplierInvoice_voidedByMember                SupplierInvoice[]               @relation("SupplierInvoice_voidedByMember")
+  supplierInvoiceItem_createdByMember           SupplierInvoiceItem[]           @relation("SupplierInvoiceItem_createdByMember")
+  supplierInvoiceItem_updatedByMember           SupplierInvoiceItem[]           @relation("SupplierInvoiceItem_updatedByMember")
+  salesOrder_createdByMember                    SalesOrder[]                    @relation("SalesOrder_createdByMember")
+  salesOrder_updatedByMember                    SalesOrder[]                    @relation("SalesOrder_updatedByMember")
+  salesOrder_voidedByMember                     SalesOrder[]                    @relation("SalesOrder_voidedByMember")
+  salesOrderItem_createdByMember                SalesOrderItem[]                @relation("SalesOrderItem_createdByMember")
+  salesOrderItem_updatedByMember                SalesOrderItem[]                @relation("SalesOrderItem_updatedByMember")
+  salesInvoice_createdByMember                  SalesInvoice[]                  @relation("SalesInvoice_createdByMember")
+  salesInvoice_updatedByMember                  SalesInvoice[]                  @relation("SalesInvoice_updatedByMember")
+  salesInvoice_voidedByMember                   SalesInvoice[]                  @relation("SalesInvoice_voidedByMember")
+  salesInvoiceItem_createdByMember              SalesInvoiceItem[]              @relation("SalesInvoiceItem_createdByMember")
+  salesInvoiceItem_updatedByMember              SalesInvoiceItem[]              @relation("SalesInvoiceItem_updatedByMember")
+  supplierPayment_createdByMember               SupplierPayment[]               @relation("SupplierPayment_createdByMember")
+  supplierPayment_updatedByMember               SupplierPayment[]               @relation("SupplierPayment_updatedByMember")
+  supplierPayment_voidedByMember                SupplierPayment[]               @relation("SupplierPayment_voidedByMember")
+  customerPayment_createdByMember               CustomerPayment[]               @relation("CustomerPayment_createdByMember")
+  customerPayment_updatedByMember               CustomerPayment[]               @relation("CustomerPayment_updatedByMember")
+  customerPayment_voidedByMember                CustomerPayment[]               @relation("CustomerPayment_voidedByMember")
+  supplierPaymentAllocation_createdByMember     SupplierPaymentAllocation[]     @relation("SupplierPaymentAllocation_createdByMember")
+  supplierPaymentAllocation_updatedByMember     SupplierPaymentAllocation[]     @relation("SupplierPaymentAllocation_updatedByMember")
+  paymentSchedule_createdByMember               PaymentSchedule[]               @relation("PaymentSchedule_createdByMember")
+  paymentSchedule_updatedByMember               PaymentSchedule[]               @relation("PaymentSchedule_updatedByMember")
+  paymentInstallment_createdByMember            PaymentInstallment[]            @relation("PaymentInstallment_createdByMember")
+  paymentInstallment_updatedByMember            PaymentInstallment[]            @relation("PaymentInstallment_updatedByMember")
+  customerPaymentAllocation_createdByMember     CustomerPaymentAllocation[]     @relation("CustomerPaymentAllocation_createdByMember")
+  customerPaymentAllocation_updatedByMember     CustomerPaymentAllocation[]     @relation("CustomerPaymentAllocation_updatedByMember")
+  billOfMaterial_createdByMember                BillOfMaterial[]                @relation("BillOfMaterial_createdByMember")
+  billOfMaterial_updatedByMember                BillOfMaterial[]                @relation("BillOfMaterial_updatedByMember")
+  billOfMaterialItem_createdByMember            BillOfMaterialItem[]            @relation("BillOfMaterialItem_createdByMember")
+  billOfMaterialItem_updatedByMember            BillOfMaterialItem[]            @relation("BillOfMaterialItem_updatedByMember")
+  productionOrder_createdByMember               ProductionOrder[]               @relation("ProductionOrder_createdByMember")
+  productionOrder_updatedByMember               ProductionOrder[]               @relation("ProductionOrder_updatedByMember")
+  productionOrder_voidedByMember                ProductionOrder[]               @relation("ProductionOrder_voidedByMember")
+  productionMaterialConsumption_createdByMember ProductionMaterialConsumption[] @relation("ProductionMaterialConsumption_createdByMember")
+  productionMaterialConsumption_updatedByMember ProductionMaterialConsumption[] @relation("ProductionMaterialConsumption_updatedByMember")
+  productionOutput_createdByMember              ProductionOutput[]              @relation("ProductionOutput_createdByMember")
+  productionOutput_updatedByMember              ProductionOutput[]              @relation("ProductionOutput_updatedByMember")
+  expense_createdByMember                       Expense[]                       @relation("Expense_createdByMember")
+  expense_updatedByMember                       Expense[]                       @relation("Expense_updatedByMember")
+  expense_voidedByMember                        Expense[]                       @relation("Expense_voidedByMember")
+  dispatch_createdByMember                      Dispatch[]                      @relation("Dispatch_createdByMember")
+  dispatch_updatedByMember                      Dispatch[]                      @relation("Dispatch_updatedByMember")
+  dispatch_voidedByMember                       Dispatch[]                      @relation("Dispatch_voidedByMember")
+  dispatchItem_createdByMember                  DispatchItem[]                  @relation("DispatchItem_createdByMember")
+  dispatchItem_updatedByMember                  DispatchItem[]                  @relation("DispatchItem_updatedByMember")
+  inventoryMovement_createdByMember             InventoryMovement[]             @relation("InventoryMovement_createdByMember")
+  storedObject_createdByMember                  StoredObject[]                  @relation("StoredObject_createdByMember")
+  storedObject_updatedByMember                  StoredObject[]                  @relation("StoredObject_updatedByMember")
+
+  @@unique([tenantId, organizationId, id], map: "memberships_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, userId], map: "memberships_tenant_id_organization_id_user_id_key")
+  @@unique([organizationId, userId], map: "memberships_organization_id_user_id_key")
+  @@index([organizationId], map: "memberships_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "memberships_tenant_id_organization_id_created_at_idx")
+  @@index([userId, status], map: "memberships_user_id_status_idx")
+  @@map("memberships")
+}
+
+model OrganizationSettings {
+  id                           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId                     String   @map("tenant_id") @db.Uuid
+  organizationId               String   @map("organization_id") @db.Uuid
+  defaultCurrency              String   @default("PKR") @map("default_currency") @db.Char(3)
+  defaultPaymentTermsDays      Int      @default(30) @map("default_payment_terms_days")
+  invoiceFooter                String?  @map("invoice_footer")
+  invoiceNotes                 String?  @map("invoice_notes")
+  lowStockNotificationsEnabled Boolean  @default(true) @map("low_stock_notifications_enabled")
+  paymentReminderEnabled       Boolean  @default(true) @map("payment_reminder_enabled")
+  allowNegativeStock           Boolean  @default(false) @map("allow_negative_stock")
+  createdAt                    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy                    String?  @map("created_by") @db.Uuid
+  updatedBy                    String?  @map("updated_by") @db.Uuid
+
+  currency        Currency     @relation("OrganizationSettings_currency", fields: [defaultCurrency], references: [code], onDelete: Restrict, onUpdate: Restrict, map: "organization_settings_currency_fkey")
+  organization    Organization @relation("OrganizationSettings_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "organization_settings_organization_fkey")
+  createdByMember Membership?  @relation("OrganizationSettings_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "organization_settings_created_by_member_fkey")
+  updatedByMember Membership?  @relation("OrganizationSettings_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "organization_settings_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "organization_settings_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId], map: "organization_settings_tenant_id_organization_id_key")
+  @@index([organizationId], map: "organization_settings_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "organization_settings_tenant_id_organization_id_created_at_idx")
+  @@map("organization_settings")
+}
+
+model NumberSequence {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String             @map("tenant_id") @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  type           NumberSequenceType
+  prefix         String             @db.VarChar(20)
+  currentNumber  BigInt             @default(0) @map("current_number")
+  padding        Int                @default(6)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy      String?            @map("created_by") @db.Uuid
+  updatedBy      String?            @map("updated_by") @db.Uuid
+
+  organization    Organization @relation("NumberSequence_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "number_sequences_organization_fkey")
+  createdByMember Membership?  @relation("NumberSequence_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "number_sequences_created_by_member_fkey")
+  updatedByMember Membership?  @relation("NumberSequence_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "number_sequences_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "number_sequences_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, type], map: "number_sequences_tenant_id_organization_id_type_key")
+  @@index([organizationId], map: "number_sequences_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "number_sequences_tenant_id_organization_id_created_at_idx")
+  @@map("number_sequences")
+}
+
+model Unit {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String       @map("tenant_id") @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  definitionId   String?      @map("definition_id") @db.Uuid
+  code           String       @db.VarChar(20)
+  name           String       @db.VarChar(100)
+  symbol         String       @db.VarChar(20)
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy      String?      @map("created_by") @db.Uuid
+  updatedBy      String?      @map("updated_by") @db.Uuid
+
+  definition       UnitDefinition? @relation("Unit_definition", fields: [definitionId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "units_definition_fkey")
+  rawMaterial_unit RawMaterial[]   @relation("RawMaterial_unit")
+  product_unit     Product[]       @relation("Product_unit")
+  organization     Organization    @relation("Unit_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "units_organization_fkey")
+  createdByMember  Membership?     @relation("Unit_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "units_created_by_member_fkey")
+  updatedByMember  Membership?     @relation("Unit_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "units_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "units_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, code], map: "units_tenant_id_organization_id_code_key")
+  @@index([organizationId], map: "units_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "units_tenant_id_organization_id_created_at_idx")
+  @@map("units")
+}
+
+model Supplier {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String       @map("tenant_id") @db.Uuid
+  organizationId   String       @map("organization_id") @db.Uuid
+  name             String       @db.VarChar(200)
+  companyName      String?      @map("company_name") @db.VarChar(200)
+  contactPerson    String?      @map("contact_person") @db.VarChar(160)
+  phone            String?      @db.VarChar(40)
+  email            String?      @db.Citext
+  taxNumber        String?      @map("tax_number") @db.VarChar(100)
+  paymentTermsDays Int          @default(30) @map("payment_terms_days")
+  openingBalance   Decimal      @default(0) @map("opening_balance") @db.Decimal(18, 2)
+  currencyCode     String       @default("PKR") @map("currency_code") @db.Char(3)
+  notes            String?
+  status           RecordStatus @default(ACTIVE)
+  address          String?
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy        String?      @map("created_by") @db.Uuid
+  updatedBy        String?      @map("updated_by") @db.Uuid
+  deletedAt        DateTime?    @map("deleted_at") @db.Timestamptz(3)
+
+  currency                 Currency          @relation("Supplier_currency", fields: [currencyCode], references: [code], onDelete: Restrict, onUpdate: Restrict, map: "suppliers_currency_fkey")
+  purchaseOrder_supplier   PurchaseOrder[]   @relation("PurchaseOrder_supplier")
+  goodsReceipt_supplier    GoodsReceipt[]    @relation("GoodsReceipt_supplier")
+  supplierInvoice_supplier SupplierInvoice[] @relation("SupplierInvoice_supplier")
+  supplierPayment_supplier SupplierPayment[] @relation("SupplierPayment_supplier")
+  expense_supplier         Expense[]         @relation("Expense_supplier")
+  organization             Organization      @relation("Supplier_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "suppliers_organization_fkey")
+  createdByMember          Membership?       @relation("Supplier_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "suppliers_created_by_member_fkey")
+  updatedByMember          Membership?       @relation("Supplier_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "suppliers_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "suppliers_tenant_id_organization_id_id_key")
+  @@index([organizationId], map: "suppliers_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "suppliers_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, status], map: "suppliers_tenant_id_organization_id_status_idx")
+  @@index([tenantId, organizationId, name], map: "suppliers_tenant_id_organization_id_name_idx")
+  @@map("suppliers")
+}
+
+model Customer {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String       @map("tenant_id") @db.Uuid
+  organizationId   String       @map("organization_id") @db.Uuid
+  name             String       @db.VarChar(200)
+  companyName      String?      @map("company_name") @db.VarChar(200)
+  contactPerson    String?      @map("contact_person") @db.VarChar(160)
+  phone            String?      @db.VarChar(40)
+  email            String?      @db.Citext
+  taxNumber        String?      @map("tax_number") @db.VarChar(100)
+  paymentTermsDays Int          @default(30) @map("payment_terms_days")
+  openingBalance   Decimal      @default(0) @map("opening_balance") @db.Decimal(18, 2)
+  currencyCode     String       @default("PKR") @map("currency_code") @db.Char(3)
+  notes            String?
+  status           RecordStatus @default(ACTIVE)
+  billingAddress   String?      @map("billing_address")
+  shippingAddress  String?      @map("shipping_address")
+  creditLimit      Decimal      @default(0) @map("credit_limit") @db.Decimal(18, 2)
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy        String?      @map("created_by") @db.Uuid
+  updatedBy        String?      @map("updated_by") @db.Uuid
+  deletedAt        DateTime?    @map("deleted_at") @db.Timestamptz(3)
+
+  currency                 Currency          @relation("Customer_currency", fields: [currencyCode], references: [code], onDelete: Restrict, onUpdate: Restrict, map: "customers_currency_fkey")
+  salesOrder_customer      SalesOrder[]      @relation("SalesOrder_customer")
+  salesInvoice_customer    SalesInvoice[]    @relation("SalesInvoice_customer")
+  customerPayment_customer CustomerPayment[] @relation("CustomerPayment_customer")
+  dispatch_customer        Dispatch[]        @relation("Dispatch_customer")
+  organization             Organization      @relation("Customer_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "customers_organization_fkey")
+  createdByMember          Membership?       @relation("Customer_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "customers_created_by_member_fkey")
+  updatedByMember          Membership?       @relation("Customer_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "customers_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "customers_tenant_id_organization_id_id_key")
+  @@index([organizationId], map: "customers_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "customers_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, status], map: "customers_tenant_id_organization_id_status_idx")
+  @@index([tenantId, organizationId, name], map: "customers_tenant_id_organization_id_name_idx")
+  @@map("customers")
+}
+
+model RawMaterial {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String       @map("tenant_id") @db.Uuid
+  organizationId    String       @map("organization_id") @db.Uuid
+  name              String       @db.VarChar(200)
+  sku               String       @db.Citext
+  description       String?
+  unitId            String       @map("unit_id") @db.Uuid
+  minimumStockLevel Decimal      @default(0) @map("minimum_stock_level") @db.Decimal(18, 4)
+  standardCost      Decimal      @default(0) @map("standard_cost") @db.Decimal(18, 2)
+  status            RecordStatus @default(ACTIVE)
+  reorderLevel      Decimal      @default(0) @map("reorder_level") @db.Decimal(18, 4)
+  lastPurchaseCost  Decimal      @default(0) @map("last_purchase_cost") @db.Decimal(18, 2)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy         String?      @map("created_by") @db.Uuid
+  updatedBy         String?      @map("updated_by") @db.Uuid
+  deletedAt         DateTime?    @map("deleted_at") @db.Timestamptz(3)
+
+  unit                                      Unit                            @relation("RawMaterial_unit", fields: [tenantId, organizationId, unitId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "raw_materials_unit_fkey")
+  purchaseOrderItem_rawMaterial             PurchaseOrderItem[]             @relation("PurchaseOrderItem_rawMaterial")
+  goodsReceiptItem_rawMaterial              GoodsReceiptItem[]              @relation("GoodsReceiptItem_rawMaterial")
+  supplierInvoiceItem_rawMaterial           SupplierInvoiceItem[]           @relation("SupplierInvoiceItem_rawMaterial")
+  billOfMaterialItem_rawMaterial            BillOfMaterialItem[]            @relation("BillOfMaterialItem_rawMaterial")
+  productionMaterialConsumption_rawMaterial ProductionMaterialConsumption[] @relation("ProductionMaterialConsumption_rawMaterial")
+  inventoryMovement_rawMaterial             InventoryMovement[]             @relation("InventoryMovement_rawMaterial")
+  inventoryBalance_rawMaterial              InventoryBalance[]              @relation("InventoryBalance_rawMaterial")
+  organization                              Organization                    @relation("RawMaterial_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "raw_materials_organization_fkey")
+  createdByMember                           Membership?                     @relation("RawMaterial_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "raw_materials_created_by_member_fkey")
+  updatedByMember                           Membership?                     @relation("RawMaterial_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "raw_materials_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "raw_materials_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, sku], map: "raw_materials_tenant_id_organization_id_sku_key")
+  @@index([organizationId], map: "raw_materials_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "raw_materials_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, status], map: "raw_materials_tenant_id_organization_id_status_idx")
+  @@map("raw_materials")
+}
+
+model Product {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String       @map("tenant_id") @db.Uuid
+  organizationId    String       @map("organization_id") @db.Uuid
+  name              String       @db.VarChar(200)
+  sku               String       @db.Citext
+  description       String?
+  unitId            String       @map("unit_id") @db.Uuid
+  minimumStockLevel Decimal      @default(0) @map("minimum_stock_level") @db.Decimal(18, 4)
+  standardCost      Decimal      @default(0) @map("standard_cost") @db.Decimal(18, 2)
+  status            RecordStatus @default(ACTIVE)
+  sellingPrice      Decimal      @default(0) @map("selling_price") @db.Decimal(18, 2)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy         String?      @map("created_by") @db.Uuid
+  updatedBy         String?      @map("updated_by") @db.Uuid
+  deletedAt         DateTime?    @map("deleted_at") @db.Timestamptz(3)
+
+  unit                      Unit                @relation("Product_unit", fields: [tenantId, organizationId, unitId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "products_unit_fkey")
+  salesOrderItem_product    SalesOrderItem[]    @relation("SalesOrderItem_product")
+  salesInvoiceItem_product  SalesInvoiceItem[]  @relation("SalesInvoiceItem_product")
+  billOfMaterial_product    BillOfMaterial[]    @relation("BillOfMaterial_product")
+  productionOrder_product   ProductionOrder[]   @relation("ProductionOrder_product")
+  productionOutput_product  ProductionOutput[]  @relation("ProductionOutput_product")
+  dispatchItem_product      DispatchItem[]      @relation("DispatchItem_product")
+  inventoryMovement_product InventoryMovement[] @relation("InventoryMovement_product")
+  inventoryBalance_product  InventoryBalance[]  @relation("InventoryBalance_product")
+  organization              Organization        @relation("Product_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "products_organization_fkey")
+  createdByMember           Membership?         @relation("Product_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "products_created_by_member_fkey")
+  updatedByMember           Membership?         @relation("Product_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "products_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "products_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, sku], map: "products_tenant_id_organization_id_sku_key")
+  @@index([organizationId], map: "products_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "products_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, status], map: "products_tenant_id_organization_id_status_idx")
+  @@map("products")
+}
+
+model Warehouse {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String       @map("tenant_id") @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  name           String       @db.VarChar(160)
+  code           String       @db.VarChar(30)
+  address        String?
+  isDefault      Boolean      @default(false) @map("is_default")
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy      String?      @map("created_by") @db.Uuid
+  updatedBy      String?      @map("updated_by") @db.Uuid
+  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(3)
+
+  goodsReceipt_warehouse      GoodsReceipt[]      @relation("GoodsReceipt_warehouse")
+  productionOrder_warehouse   ProductionOrder[]   @relation("ProductionOrder_warehouse")
+  dispatch_warehouse          Dispatch[]          @relation("Dispatch_warehouse")
+  inventoryMovement_warehouse InventoryMovement[] @relation("InventoryMovement_warehouse")
+  inventoryBalance_warehouse  InventoryBalance[]  @relation("InventoryBalance_warehouse")
+  organization                Organization        @relation("Warehouse_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "warehouses_organization_fkey")
+  createdByMember             Membership?         @relation("Warehouse_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "warehouses_created_by_member_fkey")
+  updatedByMember             Membership?         @relation("Warehouse_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "warehouses_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "warehouses_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, code], map: "warehouses_tenant_id_organization_id_code_key")
+  @@index([organizationId], map: "warehouses_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "warehouses_tenant_id_organization_id_created_at_idx")
+  @@map("warehouses")
+}
+
+model ExpenseCategory {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String       @map("tenant_id") @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  name           String       @db.VarChar(100)
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy      String?      @map("created_by") @db.Uuid
+  updatedBy      String?      @map("updated_by") @db.Uuid
+  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(3)
+
+  expense_category Expense[]    @relation("Expense_category")
+  organization     Organization @relation("ExpenseCategory_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "expense_categories_organization_fkey")
+  createdByMember  Membership?  @relation("ExpenseCategory_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "expense_categories_created_by_member_fkey")
+  updatedByMember  Membership?  @relation("ExpenseCategory_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "expense_categories_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "expense_categories_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, name], map: "expense_categories_tenant_id_organization_id_name_key")
+  @@index([organizationId], map: "expense_categories_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "expense_categories_tenant_id_organization_id_created_at_idx")
+  @@map("expense_categories")
+}
+
+model PurchaseOrder {
+  id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId             String              @map("tenant_id") @db.Uuid
+  organizationId       String              @map("organization_id") @db.Uuid
+  purchaseOrderNumber  String              @map("purchase_order_number") @db.VarChar(50)
+  supplierId           String              @map("supplier_id") @db.Uuid
+  orderDate            DateTime            @map("order_date") @db.Date
+  expectedDeliveryDate DateTime?           @map("expected_delivery_date") @db.Date
+  status               PurchaseOrderStatus @default(DRAFT)
+  currencyCode         String              @default("PKR") @map("currency_code") @db.Char(3)
+  subtotal             Decimal             @default(0) @db.Decimal(18, 2)
+  discount             Decimal             @default(0) @db.Decimal(18, 2)
+  tax                  Decimal             @default(0) @db.Decimal(18, 2)
+  total                Decimal             @default(0) @db.Decimal(18, 2)
+  notes                String?
+  voidedAt             DateTime?           @map("voided_at") @db.Timestamptz(3)
+  voidedBy             String?             @map("voided_by") @db.Uuid
+  voidReason           String?             @map("void_reason")
+  createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy            String?             @map("created_by") @db.Uuid
+  updatedBy            String?             @map("updated_by") @db.Uuid
+
+  currency                        Currency            @relation("PurchaseOrder_currency", fields: [currencyCode], references: [code], onDelete: Restrict, onUpdate: Restrict, map: "purchase_orders_currency_fkey")
+  supplier                        Supplier            @relation("PurchaseOrder_supplier", fields: [tenantId, organizationId, supplierId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "purchase_orders_supplier_fkey")
+  purchaseOrderItem_purchaseOrder PurchaseOrderItem[] @relation("PurchaseOrderItem_purchaseOrder")
+  goodsReceipt_purchaseOrder      GoodsReceipt[]      @relation("GoodsReceipt_purchaseOrder")
+  supplierInvoice_purchaseOrder   SupplierInvoice[]   @relation("SupplierInvoice_purchaseOrder")
+  organization                    Organization        @relation("PurchaseOrder_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "purchase_orders_organization_fkey")
+  createdByMember                 Membership?         @relation("PurchaseOrder_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "purchase_orders_created_by_member_fkey")
+  updatedByMember                 Membership?         @relation("PurchaseOrder_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "purchase_orders_updated_by_member_fkey")
+  voidedByMember                  Membership?         @relation("PurchaseOrder_voidedByMember", fields: [tenantId, organizationId, voidedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "purchase_orders_voided_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "purchase_orders_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, purchaseOrderNumber], map: "purchase_orders_tenant_id_organization_id_purchase_ord_928cf608")
+  @@unique([tenantId, organizationId, id, supplierId], map: "purchase_orders_tenant_id_organization_id_id_supplier_id_key")
+  @@index([organizationId], map: "purchase_orders_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "purchase_orders_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, status], map: "purchase_orders_tenant_id_organization_id_status_idx")
+  @@index([tenantId, organizationId, supplierId, orderDate], map: "purchase_orders_tenant_id_organization_id_supplier_id__add865be")
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  purchaseOrderId String   @map("purchase_order_id") @db.Uuid
+  rawMaterialId   String   @map("raw_material_id") @db.Uuid
+  description     String?
+  quantity        Decimal  @db.Decimal(18, 4)
+  unitPrice       Decimal  @map("unit_price") @db.Decimal(18, 2)
+  discount        Decimal  @default(0) @db.Decimal(18, 2)
+  tax             Decimal  @default(0) @db.Decimal(18, 2)
+  lineTotal       Decimal  @map("line_total") @db.Decimal(18, 2)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy       String?  @map("created_by") @db.Uuid
+  updatedBy       String?  @map("updated_by") @db.Uuid
+
+  purchaseOrder                      PurchaseOrder      @relation("PurchaseOrderItem_purchaseOrder", fields: [tenantId, organizationId, purchaseOrderId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "purchase_order_items_purchase_order_fkey")
+  rawMaterial                        RawMaterial        @relation("PurchaseOrderItem_rawMaterial", fields: [tenantId, organizationId, rawMaterialId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "purchase_order_items_raw_material_fkey")
+  goodsReceiptItem_purchaseOrderItem GoodsReceiptItem[] @relation("GoodsReceiptItem_purchaseOrderItem")
+  organization                       Organization       @relation("PurchaseOrderItem_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "purchase_order_items_organization_fkey")
+  createdByMember                    Membership?        @relation("PurchaseOrderItem_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "purchase_order_items_created_by_member_fkey")
+  updatedByMember                    Membership?        @relation("PurchaseOrderItem_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "purchase_order_items_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "purchase_order_items_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, id, purchaseOrderId, rawMaterialId], map: "purchase_order_items_tenant_id_organization_id_id_purc_8d4031d4")
+  @@index([organizationId], map: "purchase_order_items_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "purchase_order_items_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, purchaseOrderId], map: "purchase_order_items_tenant_id_organization_id_purchas_5c7d4456")
+  @@map("purchase_order_items")
+}
+
+model GoodsReceipt {
+  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String             @map("tenant_id") @db.Uuid
+  organizationId  String             @map("organization_id") @db.Uuid
+  receiptNumber   String             @map("receipt_number") @db.VarChar(50)
+  purchaseOrderId String?            @map("purchase_order_id") @db.Uuid
+  supplierId      String             @map("supplier_id") @db.Uuid
+  warehouseId     String             @map("warehouse_id") @db.Uuid
+  receivedDate    DateTime           @map("received_date") @db.Date
+  status          GoodsReceiptStatus @default(DRAFT)
+  notes           String?
+  voidedAt        DateTime?          @map("voided_at") @db.Timestamptz(3)
+  voidedBy        String?            @map("voided_by") @db.Uuid
+  voidReason      String?            @map("void_reason")
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy       String?            @map("created_by") @db.Uuid
+  updatedBy       String?            @map("updated_by") @db.Uuid
+
+  purchaseOrder                 PurchaseOrder?     @relation("GoodsReceipt_purchaseOrder", fields: [tenantId, organizationId, purchaseOrderId, supplierId], references: [tenantId, organizationId, id, supplierId], onDelete: Restrict, onUpdate: Restrict, map: "goods_receipts_purchase_order_fkey")
+  supplier                      Supplier           @relation("GoodsReceipt_supplier", fields: [tenantId, organizationId, supplierId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "goods_receipts_supplier_fkey")
+  warehouse                     Warehouse          @relation("GoodsReceipt_warehouse", fields: [tenantId, organizationId, warehouseId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "goods_receipts_warehouse_fkey")
+  goodsReceiptItem_goodsReceipt GoodsReceiptItem[] @relation("GoodsReceiptItem_goodsReceipt")
+  goodsReceiptItem_receiptScope GoodsReceiptItem[] @relation("GoodsReceiptItem_receiptScope")
+  organization                  Organization       @relation("GoodsReceipt_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "goods_receipts_organization_fkey")
+  createdByMember               Membership?        @relation("GoodsReceipt_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "goods_receipts_created_by_member_fkey")
+  updatedByMember               Membership?        @relation("GoodsReceipt_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "goods_receipts_updated_by_member_fkey")
+  voidedByMember                Membership?        @relation("GoodsReceipt_voidedByMember", fields: [tenantId, organizationId, voidedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "goods_receipts_voided_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "goods_receipts_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, receiptNumber], map: "goods_receipts_tenant_id_organization_id_receipt_number_key")
+  @@unique([tenantId, organizationId, id, purchaseOrderId], map: "goods_receipts_tenant_id_organization_id_id_purchase_o_323cfc87")
+  @@index([organizationId], map: "goods_receipts_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "goods_receipts_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, supplierId, receivedDate], map: "goods_receipts_tenant_id_organization_id_supplier_id_r_c4e045df")
+  @@index([tenantId, organizationId, status], map: "goods_receipts_tenant_id_organization_id_status_idx")
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptItem {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId            String   @map("tenant_id") @db.Uuid
+  organizationId      String   @map("organization_id") @db.Uuid
+  goodsReceiptId      String   @map("goods_receipt_id") @db.Uuid
+  purchaseOrderId     String?  @map("purchase_order_id") @db.Uuid
+  purchaseOrderItemId String?  @map("purchase_order_item_id") @db.Uuid
+  rawMaterialId       String   @map("raw_material_id") @db.Uuid
+  quantityReceived    Decimal  @map("quantity_received") @db.Decimal(18, 4)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy           String?  @map("created_by") @db.Uuid
+  updatedBy           String?  @map("updated_by") @db.Uuid
+
+  goodsReceipt      GoodsReceipt?      @relation("GoodsReceiptItem_goodsReceipt", fields: [tenantId, organizationId, goodsReceiptId, purchaseOrderId], references: [tenantId, organizationId, id, purchaseOrderId], onDelete: Restrict, onUpdate: Restrict, map: "goods_receipt_items_goods_receipt_fkey")
+  purchaseOrderItem PurchaseOrderItem? @relation("GoodsReceiptItem_purchaseOrderItem", fields: [tenantId, organizationId, purchaseOrderItemId, purchaseOrderId, rawMaterialId], references: [tenantId, organizationId, id, purchaseOrderId, rawMaterialId], onDelete: Restrict, onUpdate: Restrict, map: "goods_receipt_items_purchase_order_item_fkey")
+  rawMaterial       RawMaterial        @relation("GoodsReceiptItem_rawMaterial", fields: [tenantId, organizationId, rawMaterialId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "goods_receipt_items_raw_material_fkey")
+  receiptScope      GoodsReceipt       @relation("GoodsReceiptItem_receiptScope", fields: [tenantId, organizationId, goodsReceiptId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "goods_receipt_items_receipt_scope_fkey")
+  organization      Organization       @relation("GoodsReceiptItem_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "goods_receipt_items_organization_fkey")
+  createdByMember   Membership?        @relation("GoodsReceiptItem_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "goods_receipt_items_created_by_member_fkey")
+  updatedByMember   Membership?        @relation("GoodsReceiptItem_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "goods_receipt_items_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "goods_receipt_items_tenant_id_organization_id_id_key")
+  @@index([organizationId], map: "goods_receipt_items_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "goods_receipt_items_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, goodsReceiptId], map: "goods_receipt_items_tenant_id_organization_id_goods_re_b7800a7e")
+  @@map("goods_receipt_items")
+}
+
+model SupplierInvoice {
+  id                    String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId              String        @map("tenant_id") @db.Uuid
+  organizationId        String        @map("organization_id") @db.Uuid
+  supplierInvoiceNumber String        @map("supplier_invoice_number") @db.VarChar(100)
+  internalReference     String        @map("internal_reference") @db.VarChar(50)
+  supplierId            String        @map("supplier_id") @db.Uuid
+  purchaseOrderId       String?       @map("purchase_order_id") @db.Uuid
+  invoiceDate           DateTime      @map("invoice_date") @db.Date
+  dueDate               DateTime      @map("due_date") @db.Date
+  status                InvoiceStatus @default(DRAFT)
+  currencyCode          String        @default("PKR") @map("currency_code") @db.Char(3)
+  subtotal              Decimal       @default(0) @db.Decimal(18, 2)
+  discount              Decimal       @default(0) @db.Decimal(18, 2)
+  tax                   Decimal       @default(0) @db.Decimal(18, 2)
+  total                 Decimal       @default(0) @db.Decimal(18, 2)
+  notes                 String?
+  voidedAt              DateTime?     @map("voided_at") @db.Timestamptz(3)
+  voidedBy              String?       @map("voided_by") @db.Uuid
+  voidReason            String?       @map("void_reason")
+  createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy             String?       @map("created_by") @db.Uuid
+  updatedBy             String?       @map("updated_by") @db.Uuid
+
+  currency                                  Currency                    @relation("SupplierInvoice_currency", fields: [currencyCode], references: [code], onDelete: Restrict, onUpdate: Restrict, map: "supplier_invoices_currency_fkey")
+  supplier                                  Supplier                    @relation("SupplierInvoice_supplier", fields: [tenantId, organizationId, supplierId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_invoices_supplier_fkey")
+  purchaseOrder                             PurchaseOrder?              @relation("SupplierInvoice_purchaseOrder", fields: [tenantId, organizationId, purchaseOrderId, supplierId], references: [tenantId, organizationId, id, supplierId], onDelete: Restrict, onUpdate: Restrict, map: "supplier_invoices_purchase_order_fkey")
+  supplierInvoiceItem_supplierInvoice       SupplierInvoiceItem[]       @relation("SupplierInvoiceItem_supplierInvoice")
+  supplierPaymentAllocation_supplierInvoice SupplierPaymentAllocation[] @relation("SupplierPaymentAllocation_supplierInvoice")
+  organization                              Organization                @relation("SupplierInvoice_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_invoices_organization_fkey")
+  createdByMember                           Membership?                 @relation("SupplierInvoice_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "supplier_invoices_created_by_member_fkey")
+  updatedByMember                           Membership?                 @relation("SupplierInvoice_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "supplier_invoices_updated_by_member_fkey")
+  voidedByMember                            Membership?                 @relation("SupplierInvoice_voidedByMember", fields: [tenantId, organizationId, voidedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "supplier_invoices_voided_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "supplier_invoices_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, supplierId, supplierInvoiceNumber], map: "supplier_invoices_tenant_id_organization_id_supplier_i_c53c7781")
+  @@unique([tenantId, organizationId, internalReference], map: "supplier_invoices_tenant_id_organization_id_internal_r_574a801f")
+  @@unique([tenantId, organizationId, id, supplierId], map: "supplier_invoices_tenant_id_organization_id_id_supplier_id_key")
+  @@index([organizationId], map: "supplier_invoices_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "supplier_invoices_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, status], map: "supplier_invoices_tenant_id_organization_id_status_idx")
+  @@index([tenantId, organizationId, supplierId, invoiceDate], map: "supplier_invoices_tenant_id_organization_id_supplier_i_9c0f7ce5")
+  @@index([tenantId, organizationId, dueDate], map: "supplier_invoices_tenant_id_organization_id_due_date_idx")
+  @@map("supplier_invoices")
+}
+
+model SupplierInvoiceItem {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
+  supplierInvoiceId String   @map("supplier_invoice_id") @db.Uuid
+  rawMaterialId     String   @map("raw_material_id") @db.Uuid
+  description       String?
+  quantity          Decimal  @db.Decimal(18, 4)
+  unitPrice         Decimal  @map("unit_price") @db.Decimal(18, 2)
+  discount          Decimal  @default(0) @db.Decimal(18, 2)
+  tax               Decimal  @default(0) @db.Decimal(18, 2)
+  lineTotal         Decimal  @map("line_total") @db.Decimal(18, 2)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy         String?  @map("created_by") @db.Uuid
+  updatedBy         String?  @map("updated_by") @db.Uuid
+
+  supplierInvoice SupplierInvoice @relation("SupplierInvoiceItem_supplierInvoice", fields: [tenantId, organizationId, supplierInvoiceId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_invoice_items_supplier_invoice_fkey")
+  rawMaterial     RawMaterial     @relation("SupplierInvoiceItem_rawMaterial", fields: [tenantId, organizationId, rawMaterialId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_invoice_items_raw_material_fkey")
+  organization    Organization    @relation("SupplierInvoiceItem_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_invoice_items_organization_fkey")
+  createdByMember Membership?     @relation("SupplierInvoiceItem_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "supplier_invoice_items_created_by_member_fkey")
+  updatedByMember Membership?     @relation("SupplierInvoiceItem_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "supplier_invoice_items_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "supplier_invoice_items_tenant_id_organization_id_id_key")
+  @@index([organizationId], map: "supplier_invoice_items_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "supplier_invoice_items_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, supplierInvoiceId], map: "supplier_invoice_items_tenant_id_organization_id_suppl_d59d595d")
+  @@map("supplier_invoice_items")
+}
+
+model SalesOrder {
+  id                   String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId             String           @map("tenant_id") @db.Uuid
+  organizationId       String           @map("organization_id") @db.Uuid
+  orderNumber          String           @map("order_number") @db.VarChar(50)
+  customerId           String           @map("customer_id") @db.Uuid
+  orderDate            DateTime         @map("order_date") @db.Date
+  expectedDeliveryDate DateTime?        @map("expected_delivery_date") @db.Date
+  status               SalesOrderStatus @default(DRAFT)
+  currencyCode         String           @default("PKR") @map("currency_code") @db.Char(3)
+  subtotal             Decimal          @default(0) @db.Decimal(18, 2)
+  discount             Decimal          @default(0) @db.Decimal(18, 2)
+  tax                  Decimal          @default(0) @db.Decimal(18, 2)
+  total                Decimal          @default(0) @db.Decimal(18, 2)
+  notes                String?
+  voidedAt             DateTime?        @map("voided_at") @db.Timestamptz(3)
+  voidedBy             String?          @map("voided_by") @db.Uuid
+  voidReason           String?          @map("void_reason")
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy            String?          @map("created_by") @db.Uuid
+  updatedBy            String?          @map("updated_by") @db.Uuid
+
+  currency                  Currency         @relation("SalesOrder_currency", fields: [currencyCode], references: [code], onDelete: Restrict, onUpdate: Restrict, map: "sales_orders_currency_fkey")
+  customer                  Customer         @relation("SalesOrder_customer", fields: [tenantId, organizationId, customerId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "sales_orders_customer_fkey")
+  salesOrderItem_salesOrder SalesOrderItem[] @relation("SalesOrderItem_salesOrder")
+  salesInvoice_salesOrder   SalesInvoice[]   @relation("SalesInvoice_salesOrder")
+  dispatch_salesOrder       Dispatch[]       @relation("Dispatch_salesOrder")
+  organization              Organization     @relation("SalesOrder_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "sales_orders_organization_fkey")
+  createdByMember           Membership?      @relation("SalesOrder_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "sales_orders_created_by_member_fkey")
+  updatedByMember           Membership?      @relation("SalesOrder_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "sales_orders_updated_by_member_fkey")
+  voidedByMember            Membership?      @relation("SalesOrder_voidedByMember", fields: [tenantId, organizationId, voidedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "sales_orders_voided_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "sales_orders_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, orderNumber], map: "sales_orders_tenant_id_organization_id_order_number_key")
+  @@unique([tenantId, organizationId, id, customerId], map: "sales_orders_tenant_id_organization_id_id_customer_id_key")
+  @@index([organizationId], map: "sales_orders_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "sales_orders_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, status], map: "sales_orders_tenant_id_organization_id_status_idx")
+  @@index([tenantId, organizationId, customerId, orderDate], map: "sales_orders_tenant_id_organization_id_customer_id_ord_27e597ee")
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  salesOrderId   String   @map("sales_order_id") @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  description    String?
+  quantity       Decimal  @db.Decimal(18, 4)
+  unitPrice      Decimal  @map("unit_price") @db.Decimal(18, 2)
+  discount       Decimal  @default(0) @db.Decimal(18, 2)
+  tax            Decimal  @default(0) @db.Decimal(18, 2)
+  lineTotal      Decimal  @map("line_total") @db.Decimal(18, 2)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy      String?  @map("created_by") @db.Uuid
+  updatedBy      String?  @map("updated_by") @db.Uuid
+
+  salesOrder                  SalesOrder     @relation("SalesOrderItem_salesOrder", fields: [tenantId, organizationId, salesOrderId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "sales_order_items_sales_order_fkey")
+  product                     Product        @relation("SalesOrderItem_product", fields: [tenantId, organizationId, productId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "sales_order_items_product_fkey")
+  dispatchItem_salesOrderItem DispatchItem[] @relation("DispatchItem_salesOrderItem")
+  organization                Organization   @relation("SalesOrderItem_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "sales_order_items_organization_fkey")
+  createdByMember             Membership?    @relation("SalesOrderItem_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "sales_order_items_created_by_member_fkey")
+  updatedByMember             Membership?    @relation("SalesOrderItem_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "sales_order_items_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "sales_order_items_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, id, salesOrderId, productId], map: "sales_order_items_tenant_id_organization_id_id_sales_o_8089db15")
+  @@index([organizationId], map: "sales_order_items_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "sales_order_items_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, salesOrderId], map: "sales_order_items_tenant_id_organization_id_sales_order_id_idx")
+  @@map("sales_order_items")
+}
+
+model SalesInvoice {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String        @map("tenant_id") @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  invoiceNumber  String        @map("invoice_number") @db.VarChar(50)
+  customerId     String        @map("customer_id") @db.Uuid
+  salesOrderId   String?       @map("sales_order_id") @db.Uuid
+  invoiceDate    DateTime      @map("invoice_date") @db.Date
+  dueDate        DateTime      @map("due_date") @db.Date
+  status         InvoiceStatus @default(DRAFT)
+  currencyCode   String        @default("PKR") @map("currency_code") @db.Char(3)
+  subtotal       Decimal       @default(0) @db.Decimal(18, 2)
+  discount       Decimal       @default(0) @db.Decimal(18, 2)
+  tax            Decimal       @default(0) @db.Decimal(18, 2)
+  total          Decimal       @default(0) @db.Decimal(18, 2)
+  notes          String?
+  voidedAt       DateTime?     @map("voided_at") @db.Timestamptz(3)
+  voidedBy       String?       @map("voided_by") @db.Uuid
+  voidReason     String?       @map("void_reason")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy      String?       @map("created_by") @db.Uuid
+  updatedBy      String?       @map("updated_by") @db.Uuid
+
+  currency                               Currency                    @relation("SalesInvoice_currency", fields: [currencyCode], references: [code], onDelete: Restrict, onUpdate: Restrict, map: "sales_invoices_currency_fkey")
+  customer                               Customer                    @relation("SalesInvoice_customer", fields: [tenantId, organizationId, customerId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "sales_invoices_customer_fkey")
+  salesOrder                             SalesOrder?                 @relation("SalesInvoice_salesOrder", fields: [tenantId, organizationId, salesOrderId, customerId], references: [tenantId, organizationId, id, customerId], onDelete: Restrict, onUpdate: Restrict, map: "sales_invoices_sales_order_fkey")
+  salesInvoiceItem_salesInvoice          SalesInvoiceItem[]          @relation("SalesInvoiceItem_salesInvoice")
+  paymentSchedule_salesInvoice           PaymentSchedule[]           @relation("PaymentSchedule_salesInvoice")
+  customerPaymentAllocation_salesInvoice CustomerPaymentAllocation[] @relation("CustomerPaymentAllocation_salesInvoice")
+  organization                           Organization                @relation("SalesInvoice_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "sales_invoices_organization_fkey")
+  createdByMember                        Membership?                 @relation("SalesInvoice_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "sales_invoices_created_by_member_fkey")
+  updatedByMember                        Membership?                 @relation("SalesInvoice_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "sales_invoices_updated_by_member_fkey")
+  voidedByMember                         Membership?                 @relation("SalesInvoice_voidedByMember", fields: [tenantId, organizationId, voidedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "sales_invoices_voided_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "sales_invoices_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, invoiceNumber], map: "sales_invoices_tenant_id_organization_id_invoice_number_key")
+  @@unique([tenantId, organizationId, id, customerId], map: "sales_invoices_tenant_id_organization_id_id_customer_id_key")
+  @@index([organizationId], map: "sales_invoices_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "sales_invoices_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, status], map: "sales_invoices_tenant_id_organization_id_status_idx")
+  @@index([tenantId, organizationId, customerId, invoiceDate], map: "sales_invoices_tenant_id_organization_id_customer_id_i_1b9816b5")
+  @@index([tenantId, organizationId, dueDate], map: "sales_invoices_tenant_id_organization_id_due_date_idx")
+  @@map("sales_invoices")
+}
+
+model SalesInvoiceItem {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  salesInvoiceId String   @map("sales_invoice_id") @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  description    String?
+  quantity       Decimal  @db.Decimal(18, 4)
+  unitPrice      Decimal  @map("unit_price") @db.Decimal(18, 2)
+  discount       Decimal  @default(0) @db.Decimal(18, 2)
+  tax            Decimal  @default(0) @db.Decimal(18, 2)
+  lineTotal      Decimal  @map("line_total") @db.Decimal(18, 2)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy      String?  @map("created_by") @db.Uuid
+  updatedBy      String?  @map("updated_by") @db.Uuid
+
+  salesInvoice    SalesInvoice @relation("SalesInvoiceItem_salesInvoice", fields: [tenantId, organizationId, salesInvoiceId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "sales_invoice_items_sales_invoice_fkey")
+  product         Product      @relation("SalesInvoiceItem_product", fields: [tenantId, organizationId, productId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "sales_invoice_items_product_fkey")
+  organization    Organization @relation("SalesInvoiceItem_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "sales_invoice_items_organization_fkey")
+  createdByMember Membership?  @relation("SalesInvoiceItem_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "sales_invoice_items_created_by_member_fkey")
+  updatedByMember Membership?  @relation("SalesInvoiceItem_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "sales_invoice_items_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "sales_invoice_items_tenant_id_organization_id_id_key")
+  @@index([organizationId], map: "sales_invoice_items_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "sales_invoice_items_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, salesInvoiceId], map: "sales_invoice_items_tenant_id_organization_id_sales_in_c4bdb5f7")
+  @@map("sales_invoice_items")
+}
+
+model SupplierPayment {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String        @map("tenant_id") @db.Uuid
+  organizationId  String        @map("organization_id") @db.Uuid
+  supplierId      String        @map("supplier_id") @db.Uuid
+  paymentNumber   String        @map("payment_number") @db.VarChar(50)
+  paymentDate     DateTime      @map("payment_date") @db.Date
+  amount          Decimal       @db.Decimal(18, 2)
+  currencyCode    String        @default("PKR") @map("currency_code") @db.Char(3)
+  paymentMethod   PaymentMethod @map("payment_method")
+  referenceNumber String?       @map("reference_number") @db.VarChar(100)
+  notes           String?
+  status          PaymentStatus @default(POSTED)
+  voidedAt        DateTime?     @map("voided_at") @db.Timestamptz(3)
+  voidedBy        String?       @map("voided_by") @db.Uuid
+  voidReason      String?       @map("void_reason")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy       String?       @map("created_by") @db.Uuid
+  updatedBy       String?       @map("updated_by") @db.Uuid
+
+  supplier                                  Supplier                    @relation("SupplierPayment_supplier", fields: [tenantId, organizationId, supplierId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_payments_supplier_fkey")
+  currency                                  Currency                    @relation("SupplierPayment_currency", fields: [currencyCode], references: [code], onDelete: Restrict, onUpdate: Restrict, map: "supplier_payments_currency_fkey")
+  supplierPaymentAllocation_supplierPayment SupplierPaymentAllocation[] @relation("SupplierPaymentAllocation_supplierPayment")
+  organization                              Organization                @relation("SupplierPayment_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_payments_organization_fkey")
+  createdByMember                           Membership?                 @relation("SupplierPayment_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "supplier_payments_created_by_member_fkey")
+  updatedByMember                           Membership?                 @relation("SupplierPayment_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "supplier_payments_updated_by_member_fkey")
+  voidedByMember                            Membership?                 @relation("SupplierPayment_voidedByMember", fields: [tenantId, organizationId, voidedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "supplier_payments_voided_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "supplier_payments_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, paymentNumber], map: "supplier_payments_tenant_id_organization_id_payment_number_key")
+  @@unique([tenantId, organizationId, id, supplierId], map: "supplier_payments_tenant_id_organization_id_id_supplier_id_key")
+  @@index([organizationId], map: "supplier_payments_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "supplier_payments_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, supplierId, paymentDate], map: "supplier_payments_tenant_id_organization_id_supplier_i_78f75bdf")
+  @@index([tenantId, organizationId, status], map: "supplier_payments_tenant_id_organization_id_status_idx")
+  @@map("supplier_payments")
+}
+
+model CustomerPayment {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String        @map("tenant_id") @db.Uuid
+  organizationId  String        @map("organization_id") @db.Uuid
+  customerId      String        @map("customer_id") @db.Uuid
+  paymentNumber   String        @map("payment_number") @db.VarChar(50)
+  paymentDate     DateTime      @map("payment_date") @db.Date
+  amount          Decimal       @db.Decimal(18, 2)
+  currencyCode    String        @default("PKR") @map("currency_code") @db.Char(3)
+  paymentMethod   PaymentMethod @map("payment_method")
+  referenceNumber String?       @map("reference_number") @db.VarChar(100)
+  notes           String?
+  status          PaymentStatus @default(POSTED)
+  voidedAt        DateTime?     @map("voided_at") @db.Timestamptz(3)
+  voidedBy        String?       @map("voided_by") @db.Uuid
+  voidReason      String?       @map("void_reason")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy       String?       @map("created_by") @db.Uuid
+  updatedBy       String?       @map("updated_by") @db.Uuid
+
+  customer                                  Customer                    @relation("CustomerPayment_customer", fields: [tenantId, organizationId, customerId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "customer_payments_customer_fkey")
+  currency                                  Currency                    @relation("CustomerPayment_currency", fields: [currencyCode], references: [code], onDelete: Restrict, onUpdate: Restrict, map: "customer_payments_currency_fkey")
+  customerPaymentAllocation_customerPayment CustomerPaymentAllocation[] @relation("CustomerPaymentAllocation_customerPayment")
+  organization                              Organization                @relation("CustomerPayment_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "customer_payments_organization_fkey")
+  createdByMember                           Membership?                 @relation("CustomerPayment_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "customer_payments_created_by_member_fkey")
+  updatedByMember                           Membership?                 @relation("CustomerPayment_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "customer_payments_updated_by_member_fkey")
+  voidedByMember                            Membership?                 @relation("CustomerPayment_voidedByMember", fields: [tenantId, organizationId, voidedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "customer_payments_voided_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "customer_payments_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, paymentNumber], map: "customer_payments_tenant_id_organization_id_payment_number_key")
+  @@unique([tenantId, organizationId, id, customerId], map: "customer_payments_tenant_id_organization_id_id_customer_id_key")
+  @@index([organizationId], map: "customer_payments_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "customer_payments_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, customerId, paymentDate], map: "customer_payments_tenant_id_organization_id_customer_i_4d277426")
+  @@index([tenantId, organizationId, status], map: "customer_payments_tenant_id_organization_id_status_idx")
+  @@map("customer_payments")
+}
+
+model SupplierPaymentAllocation {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
+  supplierPaymentId String   @map("supplier_payment_id") @db.Uuid
+  supplierInvoiceId String   @map("supplier_invoice_id") @db.Uuid
+  supplierId        String   @map("supplier_id") @db.Uuid
+  amount            Decimal  @db.Decimal(18, 2)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy         String?  @map("created_by") @db.Uuid
+  updatedBy         String?  @map("updated_by") @db.Uuid
+
+  supplierPayment SupplierPayment @relation("SupplierPaymentAllocation_supplierPayment", fields: [tenantId, organizationId, supplierPaymentId, supplierId], references: [tenantId, organizationId, id, supplierId], onDelete: Restrict, onUpdate: Restrict, map: "supplier_payment_allocations_supplier_payment_fkey")
+  supplierInvoice SupplierInvoice @relation("SupplierPaymentAllocation_supplierInvoice", fields: [tenantId, organizationId, supplierInvoiceId, supplierId], references: [tenantId, organizationId, id, supplierId], onDelete: Restrict, onUpdate: Restrict, map: "supplier_payment_allocations_supplier_invoice_fkey")
+  organization    Organization    @relation("SupplierPaymentAllocation_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_payment_allocations_organization_fkey")
+  createdByMember Membership?     @relation("SupplierPaymentAllocation_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "supplier_payment_allocations_created_by_member_fkey")
+  updatedByMember Membership?     @relation("SupplierPaymentAllocation_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "supplier_payment_allocations_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "supplier_payment_allocations_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, supplierPaymentId, supplierInvoiceId], map: "supplier_payment_allocations_tenant_id_organization_id_ad0c7874")
+  @@index([organizationId], map: "supplier_payment_allocations_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "supplier_payment_allocations_tenant_id_organization_id_36f4f01a")
+  @@index([tenantId, organizationId, supplierInvoiceId], map: "supplier_payment_allocations_tenant_id_organization_id_12dbdeb2")
+  @@map("supplier_payment_allocations")
+}
+
+model PaymentSchedule {
+  id                   String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId             String         @map("tenant_id") @db.Uuid
+  organizationId       String         @map("organization_id") @db.Uuid
+  salesInvoiceId       String         @map("sales_invoice_id") @db.Uuid
+  scheduleType         ScheduleType   @map("schedule_type")
+  numberOfInstallments Int            @map("number_of_installments")
+  scheduledAmount      Decimal        @map("scheduled_amount") @db.Decimal(18, 2)
+  startDate            DateTime       @map("start_date") @db.Date
+  status               ScheduleStatus @default(ACTIVE)
+  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy            String?        @map("created_by") @db.Uuid
+  updatedBy            String?        @map("updated_by") @db.Uuid
+
+  salesInvoice                       SalesInvoice         @relation("PaymentSchedule_salesInvoice", fields: [tenantId, organizationId, salesInvoiceId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "payment_schedules_sales_invoice_fkey")
+  paymentInstallment_paymentSchedule PaymentInstallment[] @relation("PaymentInstallment_paymentSchedule")
+  organization                       Organization         @relation("PaymentSchedule_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "payment_schedules_organization_fkey")
+  createdByMember                    Membership?          @relation("PaymentSchedule_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "payment_schedules_created_by_member_fkey")
+  updatedByMember                    Membership?          @relation("PaymentSchedule_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "payment_schedules_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "payment_schedules_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, id, salesInvoiceId], map: "payment_schedules_tenant_id_organization_id_id_sales_i_a0106a16")
+  @@index([organizationId], map: "payment_schedules_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "payment_schedules_tenant_id_organization_id_created_at_idx")
+  @@map("payment_schedules")
+}
+
+model PaymentInstallment {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String            @map("tenant_id") @db.Uuid
+  organizationId    String            @map("organization_id") @db.Uuid
+  paymentScheduleId String            @map("payment_schedule_id") @db.Uuid
+  salesInvoiceId    String            @map("sales_invoice_id") @db.Uuid
+  installmentNumber Int               @map("installment_number")
+  dueDate           DateTime          @map("due_date") @db.Date
+  amount            Decimal           @db.Decimal(18, 2)
+  status            InstallmentStatus @default(UPCOMING)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy         String?           @map("created_by") @db.Uuid
+  updatedBy         String?           @map("updated_by") @db.Uuid
+
+  paymentSchedule                              PaymentSchedule             @relation("PaymentInstallment_paymentSchedule", fields: [tenantId, organizationId, paymentScheduleId, salesInvoiceId], references: [tenantId, organizationId, id, salesInvoiceId], onDelete: Restrict, onUpdate: Restrict, map: "payment_installments_payment_schedule_fkey")
+  customerPaymentAllocation_paymentInstallment CustomerPaymentAllocation[] @relation("CustomerPaymentAllocation_paymentInstallment")
+  organization                                 Organization                @relation("PaymentInstallment_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "payment_installments_organization_fkey")
+  createdByMember                              Membership?                 @relation("PaymentInstallment_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "payment_installments_created_by_member_fkey")
+  updatedByMember                              Membership?                 @relation("PaymentInstallment_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "payment_installments_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "payment_installments_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, id, salesInvoiceId], map: "payment_installments_tenant_id_organization_id_id_sale_8d71e449")
+  @@unique([tenantId, organizationId, paymentScheduleId, installmentNumber], map: "payment_installments_tenant_id_organization_id_payment_d74bf7e0")
+  @@index([organizationId], map: "payment_installments_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "payment_installments_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, dueDate, status], map: "payment_installments_tenant_id_organization_id_due_dat_c7496098")
+  @@map("payment_installments")
+}
+
+model CustomerPaymentAllocation {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId             String   @map("tenant_id") @db.Uuid
+  organizationId       String   @map("organization_id") @db.Uuid
+  customerPaymentId    String   @map("customer_payment_id") @db.Uuid
+  salesInvoiceId       String   @map("sales_invoice_id") @db.Uuid
+  customerId           String   @map("customer_id") @db.Uuid
+  paymentInstallmentId String?  @map("payment_installment_id") @db.Uuid
+  amount               Decimal  @db.Decimal(18, 2)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy            String?  @map("created_by") @db.Uuid
+  updatedBy            String?  @map("updated_by") @db.Uuid
+
+  customerPayment    CustomerPayment     @relation("CustomerPaymentAllocation_customerPayment", fields: [tenantId, organizationId, customerPaymentId, customerId], references: [tenantId, organizationId, id, customerId], onDelete: Restrict, onUpdate: Restrict, map: "customer_payment_allocations_customer_payment_fkey")
+  salesInvoice       SalesInvoice        @relation("CustomerPaymentAllocation_salesInvoice", fields: [tenantId, organizationId, salesInvoiceId, customerId], references: [tenantId, organizationId, id, customerId], onDelete: Restrict, onUpdate: Restrict, map: "customer_payment_allocations_sales_invoice_fkey")
+  paymentInstallment PaymentInstallment? @relation("CustomerPaymentAllocation_paymentInstallment", fields: [tenantId, organizationId, paymentInstallmentId, salesInvoiceId], references: [tenantId, organizationId, id, salesInvoiceId], onDelete: Restrict, onUpdate: Restrict, map: "customer_payment_allocations_payment_installment_fkey")
+  organization       Organization        @relation("CustomerPaymentAllocation_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "customer_payment_allocations_organization_fkey")
+  createdByMember    Membership?         @relation("CustomerPaymentAllocation_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "customer_payment_allocations_created_by_member_fkey")
+  updatedByMember    Membership?         @relation("CustomerPaymentAllocation_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "customer_payment_allocations_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "customer_payment_allocations_tenant_id_organization_id_id_key")
+  @@index([organizationId], map: "customer_payment_allocations_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "customer_payment_allocations_tenant_id_organization_id_9a14d81f")
+  @@index([tenantId, organizationId, salesInvoiceId], map: "customer_payment_allocations_tenant_id_organization_id_0d73f0e7")
+  @@index([tenantId, organizationId, customerPaymentId], map: "customer_payment_allocations_tenant_id_organization_id_b0269f28")
+  @@map("customer_payment_allocations")
+}
+
+model BillOfMaterial {
+  id             String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String               @map("tenant_id") @db.Uuid
+  organizationId String               @map("organization_id") @db.Uuid
+  productId      String               @map("product_id") @db.Uuid
+  version        Int
+  status         BillOfMaterialStatus @default(DRAFT)
+  effectiveFrom  DateTime?            @map("effective_from") @db.Date
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy      String?              @map("created_by") @db.Uuid
+  updatedBy      String?              @map("updated_by") @db.Uuid
+
+  product                           Product              @relation("BillOfMaterial_product", fields: [tenantId, organizationId, productId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "bills_of_material_product_fkey")
+  billOfMaterialItem_billOfMaterial BillOfMaterialItem[] @relation("BillOfMaterialItem_billOfMaterial")
+  productionOrder_billOfMaterial    ProductionOrder[]    @relation("ProductionOrder_billOfMaterial")
+  organization                      Organization         @relation("BillOfMaterial_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "bills_of_material_organization_fkey")
+  createdByMember                   Membership?          @relation("BillOfMaterial_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "bills_of_material_created_by_member_fkey")
+  updatedByMember                   Membership?          @relation("BillOfMaterial_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "bills_of_material_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "bills_of_material_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, productId, version], map: "bills_of_material_tenant_id_organization_id_product_id_9ba1135c")
+  @@unique([tenantId, organizationId, id, productId], map: "bills_of_material_tenant_id_organization_id_id_product_id_key")
+  @@index([organizationId], map: "bills_of_material_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "bills_of_material_tenant_id_organization_id_created_at_idx")
+  @@map("bills_of_material")
+}
+
+model BillOfMaterialItem {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
+  billOfMaterialId  String   @map("bill_of_material_id") @db.Uuid
+  rawMaterialId     String   @map("raw_material_id") @db.Uuid
+  quantityRequired  Decimal  @map("quantity_required") @db.Decimal(18, 4)
+  wastagePercentage Decimal  @default(0) @map("wastage_percentage") @db.Decimal(7, 4)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy         String?  @map("created_by") @db.Uuid
+  updatedBy         String?  @map("updated_by") @db.Uuid
+
+  billOfMaterial  BillOfMaterial @relation("BillOfMaterialItem_billOfMaterial", fields: [tenantId, organizationId, billOfMaterialId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "bill_of_material_items_bill_of_material_fkey")
+  rawMaterial     RawMaterial    @relation("BillOfMaterialItem_rawMaterial", fields: [tenantId, organizationId, rawMaterialId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "bill_of_material_items_raw_material_fkey")
+  organization    Organization   @relation("BillOfMaterialItem_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "bill_of_material_items_organization_fkey")
+  createdByMember Membership?    @relation("BillOfMaterialItem_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "bill_of_material_items_created_by_member_fkey")
+  updatedByMember Membership?    @relation("BillOfMaterialItem_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "bill_of_material_items_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "bill_of_material_items_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, billOfMaterialId, rawMaterialId], map: "bill_of_material_items_tenant_id_organization_id_bill__72a5e3fc")
+  @@index([organizationId], map: "bill_of_material_items_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "bill_of_material_items_tenant_id_organization_id_created_at_idx")
+  @@map("bill_of_material_items")
+}
+
+model ProductionOrder {
+  id               String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String                @map("tenant_id") @db.Uuid
+  organizationId   String                @map("organization_id") @db.Uuid
+  productionNumber String                @map("production_number") @db.VarChar(50)
+  productId        String                @map("product_id") @db.Uuid
+  warehouseId      String                @map("warehouse_id") @db.Uuid
+  billOfMaterialId String?               @map("bill_of_material_id") @db.Uuid
+  plannedQuantity  Decimal               @map("planned_quantity") @db.Decimal(18, 4)
+  actualQuantity   Decimal               @default(0) @map("actual_quantity") @db.Decimal(18, 4)
+  plannedStartDate DateTime?             @map("planned_start_date") @db.Date
+  plannedEndDate   DateTime?             @map("planned_end_date") @db.Date
+  actualStartDate  DateTime?             @map("actual_start_date") @db.Timestamptz(3)
+  actualEndDate    DateTime?             @map("actual_end_date") @db.Timestamptz(3)
+  status           ProductionOrderStatus @default(DRAFT)
+  notes            String?
+  voidedAt         DateTime?             @map("voided_at") @db.Timestamptz(3)
+  voidedBy         String?               @map("voided_by") @db.Uuid
+  voidReason       String?               @map("void_reason")
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy        String?               @map("created_by") @db.Uuid
+  updatedBy        String?               @map("updated_by") @db.Uuid
+
+  product                                       Product                         @relation("ProductionOrder_product", fields: [tenantId, organizationId, productId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "production_orders_product_fkey")
+  warehouse                                     Warehouse                       @relation("ProductionOrder_warehouse", fields: [tenantId, organizationId, warehouseId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "production_orders_warehouse_fkey")
+  billOfMaterial                                BillOfMaterial?                 @relation("ProductionOrder_billOfMaterial", fields: [tenantId, organizationId, billOfMaterialId, productId], references: [tenantId, organizationId, id, productId], onDelete: Restrict, onUpdate: Restrict, map: "production_orders_bill_of_material_fkey")
+  productionMaterialConsumption_productionOrder ProductionMaterialConsumption[] @relation("ProductionMaterialConsumption_productionOrder")
+  productionOutput_productionOrder              ProductionOutput[]              @relation("ProductionOutput_productionOrder")
+  organization                                  Organization                    @relation("ProductionOrder_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "production_orders_organization_fkey")
+  createdByMember                               Membership?                     @relation("ProductionOrder_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "production_orders_created_by_member_fkey")
+  updatedByMember                               Membership?                     @relation("ProductionOrder_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "production_orders_updated_by_member_fkey")
+  voidedByMember                                Membership?                     @relation("ProductionOrder_voidedByMember", fields: [tenantId, organizationId, voidedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "production_orders_voided_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "production_orders_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, id, productId], map: "production_orders_tenant_id_organization_id_id_product_id_key")
+  @@unique([tenantId, organizationId, productionNumber], map: "production_orders_tenant_id_organization_id_production_d620bdc2")
+  @@index([organizationId], map: "production_orders_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "production_orders_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, status], map: "production_orders_tenant_id_organization_id_status_idx")
+  @@map("production_orders")
+}
+
+model ProductionMaterialConsumption {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
+  productionOrderId String   @map("production_order_id") @db.Uuid
+  rawMaterialId     String   @map("raw_material_id") @db.Uuid
+  plannedQuantity   Decimal  @map("planned_quantity") @db.Decimal(18, 4)
+  actualQuantity    Decimal  @default(0) @map("actual_quantity") @db.Decimal(18, 4)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy         String?  @map("created_by") @db.Uuid
+  updatedBy         String?  @map("updated_by") @db.Uuid
+
+  productionOrder ProductionOrder @relation("ProductionMaterialConsumption_productionOrder", fields: [tenantId, organizationId, productionOrderId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "production_material_consumptions_production_order_fkey")
+  rawMaterial     RawMaterial     @relation("ProductionMaterialConsumption_rawMaterial", fields: [tenantId, organizationId, rawMaterialId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "production_material_consumptions_raw_material_fkey")
+  organization    Organization    @relation("ProductionMaterialConsumption_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "production_material_consumptions_organization_fkey")
+  createdByMember Membership?     @relation("ProductionMaterialConsumption_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "production_material_consumptions_created_by_member_fkey")
+  updatedByMember Membership?     @relation("ProductionMaterialConsumption_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "production_material_consumptions_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "production_material_consumptions_tenant_id_organizatio_24902fa2")
+  @@unique([tenantId, organizationId, productionOrderId, rawMaterialId], map: "production_material_consumptions_tenant_id_organizatio_04b08faf")
+  @@index([organizationId], map: "production_material_consumptions_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "production_material_consumptions_tenant_id_organizatio_eaea0241")
+  @@map("production_material_consumptions")
+}
+
+model ProductionOutput {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
+  productionOrderId String   @map("production_order_id") @db.Uuid
+  productId         String   @map("product_id") @db.Uuid
+  quantityProduced  Decimal  @map("quantity_produced") @db.Decimal(18, 4)
+  quantityRejected  Decimal  @default(0) @map("quantity_rejected") @db.Decimal(18, 4)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy         String?  @map("created_by") @db.Uuid
+  updatedBy         String?  @map("updated_by") @db.Uuid
+
+  productionOrder ProductionOrder @relation("ProductionOutput_productionOrder", fields: [tenantId, organizationId, productionOrderId, productId], references: [tenantId, organizationId, id, productId], onDelete: Restrict, onUpdate: Restrict, map: "production_outputs_production_order_fkey")
+  product         Product         @relation("ProductionOutput_product", fields: [tenantId, organizationId, productId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "production_outputs_product_fkey")
+  organization    Organization    @relation("ProductionOutput_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "production_outputs_organization_fkey")
+  createdByMember Membership?     @relation("ProductionOutput_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "production_outputs_created_by_member_fkey")
+  updatedByMember Membership?     @relation("ProductionOutput_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "production_outputs_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "production_outputs_tenant_id_organization_id_id_key")
+  @@index([organizationId], map: "production_outputs_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "production_outputs_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, productionOrderId], map: "production_outputs_tenant_id_organization_id_productio_22089b54")
+  @@map("production_outputs")
+}
+
+model Expense {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String        @map("tenant_id") @db.Uuid
+  organizationId  String        @map("organization_id") @db.Uuid
+  expenseNumber   String        @map("expense_number") @db.VarChar(50)
+  categoryId      String        @map("category_id") @db.Uuid
+  expenseDate     DateTime      @map("expense_date") @db.Date
+  description     String
+  amount          Decimal       @db.Decimal(18, 2)
+  currencyCode    String        @default("PKR") @map("currency_code") @db.Char(3)
+  paymentMethod   PaymentMethod @map("payment_method")
+  supplierId      String?       @map("supplier_id") @db.Uuid
+  referenceNumber String?       @map("reference_number") @db.VarChar(100)
+  notes           String?
+  status          ExpenseStatus @default(POSTED)
+  voidedAt        DateTime?     @map("voided_at") @db.Timestamptz(3)
+  voidedBy        String?       @map("voided_by") @db.Uuid
+  voidReason      String?       @map("void_reason")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy       String?       @map("created_by") @db.Uuid
+  updatedBy       String?       @map("updated_by") @db.Uuid
+
+  category        ExpenseCategory @relation("Expense_category", fields: [tenantId, organizationId, categoryId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "expenses_category_fkey")
+  supplier        Supplier?       @relation("Expense_supplier", fields: [tenantId, organizationId, supplierId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "expenses_supplier_fkey")
+  currency        Currency        @relation("Expense_currency", fields: [currencyCode], references: [code], onDelete: Restrict, onUpdate: Restrict, map: "expenses_currency_fkey")
+  organization    Organization    @relation("Expense_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "expenses_organization_fkey")
+  createdByMember Membership?     @relation("Expense_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "expenses_created_by_member_fkey")
+  updatedByMember Membership?     @relation("Expense_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "expenses_updated_by_member_fkey")
+  voidedByMember  Membership?     @relation("Expense_voidedByMember", fields: [tenantId, organizationId, voidedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "expenses_voided_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "expenses_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, expenseNumber], map: "expenses_tenant_id_organization_id_expense_number_key")
+  @@index([organizationId], map: "expenses_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "expenses_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, expenseDate], map: "expenses_tenant_id_organization_id_expense_date_idx")
+  @@index([tenantId, organizationId, status], map: "expenses_tenant_id_organization_id_status_idx")
+  @@map("expenses")
+}
+
+model Dispatch {
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String         @map("tenant_id") @db.Uuid
+  organizationId    String         @map("organization_id") @db.Uuid
+  dispatchNumber    String         @map("dispatch_number") @db.VarChar(50)
+  salesOrderId      String         @map("sales_order_id") @db.Uuid
+  customerId        String         @map("customer_id") @db.Uuid
+  warehouseId       String         @map("warehouse_id") @db.Uuid
+  dispatchDate      DateTime       @map("dispatch_date") @db.Date
+  driverName        String?        @map("driver_name") @db.VarChar(160)
+  vehicleNumber     String?        @map("vehicle_number") @db.VarChar(50)
+  trackingReference String?        @map("tracking_reference") @db.VarChar(100)
+  status            DispatchStatus @default(DRAFT)
+  notes             String?
+  voidedAt          DateTime?      @map("voided_at") @db.Timestamptz(3)
+  voidedBy          String?        @map("voided_by") @db.Uuid
+  voidReason        String?        @map("void_reason")
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy         String?        @map("created_by") @db.Uuid
+  updatedBy         String?        @map("updated_by") @db.Uuid
+
+  salesOrder            SalesOrder     @relation("Dispatch_salesOrder", fields: [tenantId, organizationId, salesOrderId, customerId], references: [tenantId, organizationId, id, customerId], onDelete: Restrict, onUpdate: Restrict, map: "dispatches_sales_order_fkey")
+  customer              Customer       @relation("Dispatch_customer", fields: [tenantId, organizationId, customerId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "dispatches_customer_fkey")
+  warehouse             Warehouse      @relation("Dispatch_warehouse", fields: [tenantId, organizationId, warehouseId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "dispatches_warehouse_fkey")
+  dispatchItem_dispatch DispatchItem[] @relation("DispatchItem_dispatch")
+  organization          Organization   @relation("Dispatch_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "dispatches_organization_fkey")
+  createdByMember       Membership?    @relation("Dispatch_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "dispatches_created_by_member_fkey")
+  updatedByMember       Membership?    @relation("Dispatch_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "dispatches_updated_by_member_fkey")
+  voidedByMember        Membership?    @relation("Dispatch_voidedByMember", fields: [tenantId, organizationId, voidedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "dispatches_voided_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "dispatches_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, dispatchNumber], map: "dispatches_tenant_id_organization_id_dispatch_number_key")
+  @@unique([tenantId, organizationId, id, salesOrderId], map: "dispatches_tenant_id_organization_id_id_sales_order_id_key")
+  @@index([organizationId], map: "dispatches_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "dispatches_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, status], map: "dispatches_tenant_id_organization_id_status_idx")
+  @@map("dispatches")
+}
+
+model DispatchItem {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  dispatchId       String   @map("dispatch_id") @db.Uuid
+  salesOrderId     String   @map("sales_order_id") @db.Uuid
+  salesOrderItemId String   @map("sales_order_item_id") @db.Uuid
+  productId        String   @map("product_id") @db.Uuid
+  quantity         Decimal  @db.Decimal(18, 4)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy        String?  @map("created_by") @db.Uuid
+  updatedBy        String?  @map("updated_by") @db.Uuid
+
+  dispatch        Dispatch       @relation("DispatchItem_dispatch", fields: [tenantId, organizationId, dispatchId, salesOrderId], references: [tenantId, organizationId, id, salesOrderId], onDelete: Restrict, onUpdate: Restrict, map: "dispatch_items_dispatch_fkey")
+  salesOrderItem  SalesOrderItem @relation("DispatchItem_salesOrderItem", fields: [tenantId, organizationId, salesOrderItemId, salesOrderId, productId], references: [tenantId, organizationId, id, salesOrderId, productId], onDelete: Restrict, onUpdate: Restrict, map: "dispatch_items_sales_order_item_fkey")
+  product         Product        @relation("DispatchItem_product", fields: [tenantId, organizationId, productId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "dispatch_items_product_fkey")
+  organization    Organization   @relation("DispatchItem_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "dispatch_items_organization_fkey")
+  createdByMember Membership?    @relation("DispatchItem_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "dispatch_items_created_by_member_fkey")
+  updatedByMember Membership?    @relation("DispatchItem_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "dispatch_items_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "dispatch_items_tenant_id_organization_id_id_key")
+  @@index([organizationId], map: "dispatch_items_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "dispatch_items_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, dispatchId], map: "dispatch_items_tenant_id_organization_id_dispatch_id_idx")
+  @@map("dispatch_items")
+}
+
+model InventoryMovement {
+  id             String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String                 @map("tenant_id") @db.Uuid
+  organizationId String                 @map("organization_id") @db.Uuid
+  warehouseId    String                 @map("warehouse_id") @db.Uuid
+  itemType       InventoryItemType      @map("item_type")
+  rawMaterialId  String?                @map("raw_material_id") @db.Uuid
+  productId      String?                @map("product_id") @db.Uuid
+  movementType   InventoryMovementType  @map("movement_type")
+  quantity       Decimal                @db.Decimal(18, 4)
+  unitCost       Decimal                @default(0) @map("unit_cost") @db.Decimal(18, 2)
+  referenceType  InventoryReferenceType @map("reference_type")
+  referenceId    String?                @map("reference_id") @db.Uuid
+  reversalOfId   String?                @map("reversal_of_id") @db.Uuid
+  movementDate   DateTime               @map("movement_date") @db.Timestamptz(3)
+  notes          String?
+  createdBy      String?                @map("created_by") @db.Uuid
+  createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  warehouse                    Warehouse           @relation("InventoryMovement_warehouse", fields: [tenantId, organizationId, warehouseId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "inventory_movements_warehouse_fkey")
+  rawMaterial                  RawMaterial?        @relation("InventoryMovement_rawMaterial", fields: [tenantId, organizationId, rawMaterialId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "inventory_movements_raw_material_fkey")
+  product                      Product?            @relation("InventoryMovement_product", fields: [tenantId, organizationId, productId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "inventory_movements_product_fkey")
+  reversalOf                   InventoryMovement?  @relation("InventoryMovement_reversalOf", fields: [tenantId, organizationId, reversalOfId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "inventory_movements_reversal_of_fkey")
+  inventoryMovement_reversalOf InventoryMovement[] @relation("InventoryMovement_reversalOf")
+  organization                 Organization        @relation("InventoryMovement_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "inventory_movements_organization_fkey")
+  createdByMember              Membership?         @relation("InventoryMovement_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "inventory_movements_created_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "inventory_movements_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, reversalOfId], map: "inventory_movements_tenant_id_organization_id_reversal_9dec0332")
+  @@index([organizationId], map: "inventory_movements_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "inventory_movements_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, warehouseId, movementDate], map: "inventory_movements_tenant_id_organization_id_warehous_638f6b23")
+  @@index([tenantId, organizationId, rawMaterialId, movementDate], map: "inventory_movements_tenant_id_organization_id_raw_mate_01d39da3")
+  @@index([tenantId, organizationId, productId, movementDate], map: "inventory_movements_tenant_id_organization_id_product__7919b56f")
+  @@map("inventory_movements")
+}
+
+model InventoryBalance {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String            @map("tenant_id") @db.Uuid
+  organizationId   String            @map("organization_id") @db.Uuid
+  warehouseId      String            @map("warehouse_id") @db.Uuid
+  itemType         InventoryItemType @map("item_type")
+  rawMaterialId    String?           @map("raw_material_id") @db.Uuid
+  productId        String?           @map("product_id") @db.Uuid
+  quantityOnHand   Decimal           @default(0) @map("quantity_on_hand") @db.Decimal(18, 4)
+  quantityReserved Decimal           @default(0) @map("quantity_reserved") @db.Decimal(18, 4)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  warehouse    Warehouse    @relation("InventoryBalance_warehouse", fields: [tenantId, organizationId, warehouseId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "inventory_balances_warehouse_fkey")
+  rawMaterial  RawMaterial? @relation("InventoryBalance_rawMaterial", fields: [tenantId, organizationId, rawMaterialId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "inventory_balances_raw_material_fkey")
+  product      Product?     @relation("InventoryBalance_product", fields: [tenantId, organizationId, productId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "inventory_balances_product_fkey")
+  organization Organization @relation("InventoryBalance_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "inventory_balances_organization_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "inventory_balances_tenant_id_organization_id_id_key")
+  @@index([organizationId], map: "inventory_balances_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "inventory_balances_tenant_id_organization_id_created_at_idx")
+  @@map("inventory_balances")
+}
+
+model StoredObject {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  bucket         String   @db.VarChar(63)
+  objectKey      String   @map("object_key") @db.VarChar(1024)
+  contentType    String   @map("content_type") @db.VarChar(255)
+  sizeBytes      BigInt   @map("size_bytes")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy      String?  @map("created_by") @db.Uuid
+  updatedBy      String?  @map("updated_by") @db.Uuid
+
+  attachment_storedObject Attachment[] @relation("Attachment_storedObject")
+  organization            Organization @relation("StoredObject_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "stored_objects_organization_fkey")
+  createdByMember         Membership?  @relation("StoredObject_createdByMember", fields: [tenantId, organizationId, createdBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "stored_objects_created_by_member_fkey")
+  updatedByMember         Membership?  @relation("StoredObject_updatedByMember", fields: [tenantId, organizationId, updatedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "stored_objects_updated_by_member_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "stored_objects_tenant_id_organization_id_id_key")
+  @@unique([bucket, objectKey], map: "stored_objects_bucket_object_key_key")
+  @@index([organizationId], map: "stored_objects_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "stored_objects_tenant_id_organization_id_created_at_idx")
   @@map("stored_objects")
+}
+
+model Attachment {
+  id             String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String               @map("tenant_id") @db.Uuid
+  organizationId String               @map("organization_id") @db.Uuid
+  storedObjectId String               @map("stored_object_id") @db.Uuid
+  entityType     AttachmentEntityType @map("entity_type")
+  entityId       String               @map("entity_id") @db.Uuid
+  fileName       String               @map("file_name") @db.VarChar(255)
+  uploadedBy     String               @map("uploaded_by") @db.Uuid
+  uploadedAt     DateTime             @default(now()) @map("uploaded_at") @db.Timestamptz(3)
+  deletedAt      DateTime?            @map("deleted_at") @db.Timestamptz(3)
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  storedObject StoredObject @relation("Attachment_storedObject", fields: [tenantId, organizationId, storedObjectId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "attachments_stored_object_fkey")
+  uploader     Membership   @relation("Attachment_uploader", fields: [tenantId, organizationId, uploadedBy], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "attachments_uploader_fkey")
+  organization Organization @relation("Attachment_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "attachments_organization_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "attachments_tenant_id_organization_id_id_key")
+  @@unique([tenantId, organizationId, storedObjectId], map: "attachments_tenant_id_organization_id_stored_object_id_key")
+  @@index([organizationId], map: "attachments_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "attachments_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, entityType, entityId], map: "attachments_tenant_id_organization_id_entity_type_entity_id_idx")
+  @@map("attachments")
+}
+
+model AuditLog {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String      @map("tenant_id") @db.Uuid
+  organizationId String      @map("organization_id") @db.Uuid
+  userId         String?     @map("user_id") @db.Uuid
+  entityType     String      @map("entity_type") @db.VarChar(80)
+  entityId       String      @map("entity_id") @db.Uuid
+  action         AuditAction
+  oldValues      Json?       @map("old_values") @db.JsonB
+  newValues      Json?       @map("new_values") @db.JsonB
+  ipAddress      String?     @map("ip_address") @db.Inet
+  userAgent      String?     @map("user_agent")
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  actor        Membership?  @relation("AuditLog_actor", fields: [tenantId, organizationId, userId], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "audit_logs_actor_fkey")
+  organization Organization @relation("AuditLog_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "audit_logs_organization_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "audit_logs_tenant_id_organization_id_id_key")
+  @@index([organizationId], map: "audit_logs_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "audit_logs_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, entityType, entityId, createdAt], map: "audit_logs_tenant_id_organization_id_entity_type_entit_4d0f7faf")
+  @@map("audit_logs")
+}
+
+model Notification {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String           @map("tenant_id") @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  type           NotificationType
+  title          String           @db.VarChar(200)
+  message        String
+  entityType     String?          @map("entity_type") @db.VarChar(80)
+  entityId       String?          @map("entity_id") @db.Uuid
+  isRead         Boolean          @default(false) @map("is_read")
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  recipient    Membership   @relation("Notification_recipient", fields: [tenantId, organizationId, userId], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "notifications_recipient_fkey")
+  organization Organization @relation("Notification_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "notifications_organization_fkey")
+
+  @@unique([tenantId, organizationId, id], map: "notifications_tenant_id_organization_id_id_key")
+  @@index([organizationId], map: "notifications_organization_id_idx")
+  @@index([tenantId, organizationId, createdAt], map: "notifications_tenant_id_organization_id_created_at_idx")
+  @@index([tenantId, organizationId, userId, isRead, createdAt], map: "notifications_tenant_id_organization_id_user_id_is_rea_520405a9")
+  @@map("notifications")
 }

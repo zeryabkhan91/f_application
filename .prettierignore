@@ -5,3 +5,4 @@ package-lock.json
 packages/db/src/generated
 *.tsbuildinfo
 .local
+docs/plans/implementation-plan.md

@@ -13,3 +13,7 @@ export function createDatabase(connectionString: string) {
 
 export { PrismaClient };
 export type { StoredObject } from './generated/prisma/client.js';
+export { Prisma } from './generated/prisma/client.js';
+export * from './generated/prisma/enums.js';
+export * from './tenancy.js';
+export * from './number-sequences.js';

@@ -7,4 +7,6 @@ npm ci --no-fund
 npm run setup:local
 npm run db:up
 npm run db:deploy
+npm run db:provision
 npm run build
+npm run db:seed

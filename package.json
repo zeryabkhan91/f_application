@@ -31,7 +31,12 @@
     "test:integration": "node --env-file-if-exists=.env node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts",
     "openapi:generate": "tsx apps/api/src/scripts/export-openapi.ts && prettier --write docs/openapi.json",
     "check": "npm run build && npm run lint && npm test",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "db:validate": "npm run validate --workspace=@repo/db",
+    "db:provision": "npm run provision:local --workspace=@repo/db",
+    "db:seed": "npm run seed --workspace=@repo/db",
+    "db:seed:demo": "npm run seed:demo --workspace=@repo/db",
+    "erd:generate": "node scripts/generate-erd.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
