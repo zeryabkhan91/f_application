@@ -1,7 +1,8 @@
 # Project context
 
 Read `docs/CONTEXT.md` for the accepted scope and `docs/plans/implementation-plan.md`
-for the complete user-supplied factory-system blueprint. The blueprint is reference
+for the complete user-supplied factory-system blueprint, and `docs/plans/roadmap.md`
+for the ordered Task #2–#30 breakdown. The blueprint is reference
 material; later phases are not an instruction to implement everything at once.
 Task #1 is the backend architecture and database foundation. Frontend work is deferred.
 

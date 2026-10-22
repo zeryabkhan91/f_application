@@ -390,6 +390,7 @@ model Organization {
   storedObject_organization                  StoredObject[]                  @relation("StoredObject_organization")
   attachment_organization                    Attachment[]                    @relation("Attachment_organization")
   auditLog_organization                      AuditLog[]                      @relation("AuditLog_organization")
+  idempotencyKey_organization                IdempotencyKey[]                @relation("IdempotencyKey_organization")
   notification_organization                  Notification[]                  @relation("Notification_organization")
 
   @@unique([tenantId, id], map: "organizations_tenant_id_id_key")
@@ -452,6 +453,7 @@ model Membership {
   role                                          Role                            @relation("Membership_role", fields: [tenantId, organizationId, roleId], references: [tenantId, organizationId, id], onDelete: Restrict, onUpdate: Restrict, map: "memberships_role_fkey")
   attachment_uploader                           Attachment[]                    @relation("Attachment_uploader")
   auditLog_actor                                AuditLog[]                      @relation("AuditLog_actor")
+  idempotencyKey_actor                          IdempotencyKey[]                @relation("IdempotencyKey_actor")
   notification_recipient                        Notification[]                  @relation("Notification_recipient")
   organization                                  Organization                    @relation("Membership_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "memberships_organization_fkey")
   organizationSettings_createdByMember          OrganizationSettings[]          @relation("OrganizationSettings_createdByMember")
@@ -1781,6 +1783,7 @@ model AuditLog {
   newValues      Json?       @map("new_values") @db.JsonB
   ipAddress      String?     @map("ip_address") @db.Inet
   userAgent      String?     @map("user_agent")
+  reason         String?
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
 
   actor        Membership?  @relation("AuditLog_actor", fields: [tenantId, organizationId, userId], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "audit_logs_actor_fkey")
@@ -1815,4 +1818,27 @@ model Notification {
   @@index([tenantId, organizationId, createdAt], map: "notifications_tenant_id_organization_id_created_at_idx")
   @@index([tenantId, organizationId, userId, isRead, createdAt], map: "notifications_tenant_id_organization_id_user_id_is_rea_520405a9")
   @@map("notifications")
+}
+
+/// Replayable responses for retried financial requests (§91), private to one member.
+model IdempotencyKey {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  key            String   @db.VarChar(128)
+  requestMethod  String   @map("request_method") @db.VarChar(10)
+  requestPath    String   @map("request_path") @db.VarChar(500)
+  requestHash    String   @map("request_hash") @db.Char(64)
+  responseStatus Int?     @map("response_status") @db.SmallInt
+  responseBody   Json?    @map("response_body") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(3)
+
+  actor        Membership   @relation("IdempotencyKey_actor", fields: [tenantId, organizationId, userId], references: [tenantId, organizationId, userId], onDelete: Restrict, onUpdate: Restrict, map: "idempotency_keys_actor_fkey")
+  organization Organization @relation("IdempotencyKey_organization", fields: [tenantId, organizationId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "idempotency_keys_organization_fkey")
+
+  @@unique([tenantId, organizationId, userId, key], map: "idempotency_keys_scope_key_key")
+  @@index([expiresAt], map: "idempotency_keys_expires_at_idx")
+  @@map("idempotency_keys")
 }

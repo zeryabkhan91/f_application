@@ -22,9 +22,12 @@ export const errorResponseSchema = z.object({
     message: z.string(),
     requestId: z.string(),
     details: z.array(validationIssueSchema).optional(),
+    /** First message per field path, for binding errors to form inputs. */
+    fields: z.record(z.string(), z.string()).optional(),
   }),
 });
 
 // Re-export one Zod instance so schemas stay consistent across workspaces.
 export { z };
 export * from './domain.js';
+export * from './http.js';

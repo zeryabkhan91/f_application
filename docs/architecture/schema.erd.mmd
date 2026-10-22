@@ -762,6 +762,7 @@ erDiagram
     Json newValues
     String ipAddress
     String userAgent
+    String reason
     DateTime createdAt
   }
   Notification {
@@ -777,6 +778,20 @@ erDiagram
     Boolean isRead
     DateTime createdAt
     DateTime updatedAt
+  }
+  IdempotencyKey {
+    String id PK
+    String tenantId FK
+    String organizationId FK
+    String userId FK
+    String key
+    String requestMethod
+    String requestPath
+    String requestHash
+    Int responseStatus
+    Json responseBody
+    DateTime createdAt
+    DateTime expiresAt
   }
   Tenant ||--o{ TenantBranding : "tenant"
   Tenant ||--o{ Organization : "tenant"
@@ -979,3 +994,5 @@ erDiagram
   Organization ||--o{ AuditLog : "organization"
   Membership ||--o{ Notification : "recipient"
   Organization ||--o{ Notification : "organization"
+  Membership ||--o{ IdempotencyKey : "actor"
+  Organization ||--o{ IdempotencyKey : "organization"

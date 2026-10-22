@@ -2,18 +2,20 @@ import {
   errorResponseSchema,
   liveHealthSchema,
   readyHealthSchema,
-  serviceInfoSchema,
   unavailableHealthSchema,
   z,
 } from '@repo/validation';
+import { buildOpenApiPaths } from './http/openapi-paths.js';
+import type { ApiRoute } from './http/route.js';
+import { apiRoutes } from './modules/index.js';
 
-export function createOpenApiDocument() {
+/** Health probes live outside /api/v1 and keep their hand-written docs; all API paths are generated. */
+export function createOpenApiDocument(routes: readonly ApiRoute[] = apiRoutes) {
   const definitions = {
     ErrorResponse: errorResponseSchema,
     LiveHealth: liveHealthSchema,
     ReadyHealth: readyHealthSchema,
     UnavailableHealth: unavailableHealthSchema,
-    ServiceInfo: serviceInfoSchema,
   };
   const schemas = Object.fromEntries(
     Object.entries(definitions).map(([name, schema]) => [
@@ -31,7 +33,7 @@ export function createOpenApiDocument() {
       title: 'F Application API',
       version: '0.1.0',
       description:
-        'Backend foundation. Business and authentication endpoints will be added as requirements are defined.',
+        'Factory management API. Organization routes require an authenticated session; each documents its required permission.',
     },
     servers: [{ url: '/' }],
     components: { schemas },
@@ -64,26 +66,7 @@ export function createOpenApiDocument() {
           },
         },
       },
-      '/api/v1': {
-        get: {
-          summary: 'API identity and version',
-          tags: ['System'],
-          responses: {
-            200: {
-              description: 'Service information',
-              content: json('ServiceInfo'),
-            },
-            429: {
-              description: 'Rate limit exceeded',
-              content: json('ErrorResponse'),
-            },
-            500: {
-              description: 'Internal error',
-              content: json('ErrorResponse'),
-            },
-          },
-        },
-      },
+      ...buildOpenApiPaths(routes),
     },
   };
 }

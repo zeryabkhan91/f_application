@@ -64,7 +64,7 @@ apps/
   api/          HTTP runtime, middleware, S3 helper, tests, Dockerfile
   web/          Existing placeholder; frontend deferred
 packages/
-  db/           50 models, migrations, tenancy, sequences, reference/demo seeds
+  db/           51 models, migrations, tenancy, audit, locking, idempotency, seeds
   types/        Shared DTO/context/permission types
   validation/   Shared Zod contracts and 26 domain enums
   ui/           Existing placeholder; frontend deferred

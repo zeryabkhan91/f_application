@@ -3,7 +3,7 @@
   "info": {
     "title": "F Application API",
     "version": "0.1.0",
-    "description": "Backend foundation. Business and authentication endpoints will be added as requirements are defined."
+    "description": "Factory management API. Organization routes require an authenticated session; each documents its required permission."
   },
   "servers": [
     {
@@ -41,6 +41,12 @@
                   },
                   "required": ["path", "message"],
                   "additionalProperties": false
+                }
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
                 }
               }
             },
@@ -82,20 +88,6 @@
           }
         },
         "required": ["status"],
-        "additionalProperties": false
-      },
-      "ServiceInfo": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "enum": ["f-application-api"]
-          },
-          "version": {
-            "type": "string"
-          }
-        },
-        "required": ["name", "version"],
         "additionalProperties": false
       }
     }
@@ -149,6 +141,7 @@
     },
     "/api/v1": {
       "get": {
+        "operationId": "getServiceInfo",
         "summary": "API identity and version",
         "tags": ["System"],
         "responses": {
@@ -157,13 +150,24 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ServiceInfo"
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "enum": ["f-application-api"]
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["name", "version"],
+                  "additionalProperties": false
                 }
               }
             }
           },
           "429": {
-            "description": "Rate limit exceeded",
+            "description": "`RATE_LIMITED`: Too many requests",
             "content": {
               "application/json": {
                 "schema": {
@@ -173,7 +177,7 @@
             }
           },
           "500": {
-            "description": "Internal error",
+            "description": "`INTERNAL_ERROR`: Unexpected server error",
             "content": {
               "application/json": {
                 "schema": {

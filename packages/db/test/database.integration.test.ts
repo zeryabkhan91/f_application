@@ -159,7 +159,7 @@ describe('migrations and tenancy', () => {
       FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname <> '_prisma_migrations'
     `;
-    expect(counts[0]).toEqual({ tables: 50n, isolated: 46n });
+    expect(counts[0]).toEqual({ tables: 51n, isolated: 47n });
     const roles = await database.runtime.$queryRaw<
       Array<{ rolsuper: boolean; rolbypassrls: boolean }>
     >`SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user`;

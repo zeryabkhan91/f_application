@@ -1,6 +1,6 @@
 # Factory database ERD
 
-The [generated complete ERD](schema.erd.mmd) contains all 50 models, scalar fields,
+The [generated complete ERD](schema.erd.mmd) contains all 51 models, scalar fields,
 and concrete foreign keys. Regenerate it with `npm run erd:generate`. The diagrams
 below group the principal relationships; organization scope keys and actor links
 apply to every business entity, including child rows.
@@ -20,6 +20,7 @@ erDiagram
   Organization ||--o{ Warehouse : operates
   Organization ||--o{ Unit : measures
   UnitDefinition |o--o{ Unit : supplies_defaults
+  Membership ||--o{ IdempotencyKey : retries
 ```
 
 ```mermaid

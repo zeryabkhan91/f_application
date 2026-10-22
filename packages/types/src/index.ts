@@ -32,3 +32,13 @@ export type OrganizationContext = Readonly<
 export type RoleCode = z.infer<typeof roleCodeSchema>;
 export type PermissionCode = z.infer<typeof permissionCodeSchema>;
 export type NumberSequenceType = z.infer<typeof numberSequenceTypeSchema>;
+
+import type { paginationMetaSchema, sortOrderSchema } from '@repo/validation';
+
+export type PaginationMeta = z.infer<typeof paginationMetaSchema>;
+export type SortOrder = z.infer<typeof sortOrderSchema>;
+/** Parsed pagination fields shared by every list query. */
+export interface PageQuery {
+  page: number;
+  pageSize: number;
+}

@@ -1,6 +1,6 @@
 import type { ErrorRequestHandler } from 'express';
 import { errorResponseSchema } from '@repo/validation';
-import { ApiError } from '../lib/api-error.js';
+import { toApiError } from '../lib/error-mapping.js';
 
 export const errorHandler: ErrorRequestHandler = (
   error: unknown,
@@ -10,37 +10,12 @@ export const errorHandler: ErrorRequestHandler = (
 ) => {
   if (res.headersSent) return next(error);
 
-  let failure: ApiError;
-  if (error instanceof ApiError) {
-    failure = error;
-  } else if (
-    error instanceof SyntaxError &&
-    'type' in error &&
-    error.type === 'entity.parse.failed'
-  ) {
-    failure = new ApiError(
-      400,
-      'INVALID_JSON',
-      'Request body is not valid JSON',
+  const { error: failure, log } = toApiError(error);
+  if (log)
+    req.log?.[log.level](
+      log.detail,
+      log.level === 'error' ? 'Unhandled request error' : 'Request rejected',
     );
-  } else if (
-    error instanceof Error &&
-    'type' in error &&
-    error.type === 'entity.too.large'
-  ) {
-    failure = new ApiError(
-      413,
-      'PAYLOAD_TOO_LARGE',
-      'Request body exceeds 1 MB',
-    );
-  } else {
-    req.log?.error({ err: error }, 'Unhandled request error');
-    failure = new ApiError(
-      500,
-      'INTERNAL_ERROR',
-      'An unexpected error occurred',
-    );
-  }
 
   const body = errorResponseSchema.parse({
     error: {
@@ -48,6 +23,7 @@ export const errorHandler: ErrorRequestHandler = (
       message: failure.message,
       requestId: String(res.locals.requestId ?? req.id ?? 'unknown'),
       ...(failure.details ? { details: failure.details } : {}),
+      ...(failure.fields ? { fields: failure.fields } : {}),
     },
   });
   res.status(failure.status).json(body);

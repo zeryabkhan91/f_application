@@ -1,5 +1,5 @@
 import { parseEnvironment } from '@repo/config';
-import { createDatabase } from '@repo/db';
+import { createDatabase, withOrganization } from '@repo/db';
 import { pino } from 'pino';
 import { createApp } from './app.js';
 
@@ -10,6 +10,12 @@ const logger = pino({
     'req.headers.authorization',
     'req.headers.cookie',
     'res.headers.set-cookie',
+    'req.body',
+    '*.password',
+    '*.passwordHash',
+    '*.token',
+    '*.accessToken',
+    '*.refreshToken',
   ],
 });
 const db = createDatabase(config.DATABASE_URL);
@@ -21,6 +27,7 @@ const app = createApp({
     await db.$queryRaw`SELECT 1`;
   },
   isShuttingDown: () => shuttingDown,
+  runInOrganization: (selection, work) => withOrganization(db, selection, work),
 });
 
 const server = app.listen(config.PORT, config.HOST, () => {

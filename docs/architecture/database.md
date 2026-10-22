@@ -20,7 +20,7 @@ the factory/company boundary. Membership links users to organization-local roles
 a user can join several organizations and tenants. Default roles are organization
 records; Permission is a platform catalog, linked through RolePermission.
 
-All 42 organization-owned models have required `tenantId` and `organizationId`,
+All 43 organization-owned models have required `tenantId` and `organizationId`,
 including child lines and allocations. Organization has a unique `(tenantId, id)`
 key. Child-to-parent foreign keys include both scope IDs, backed by scoped parent
 unique keys. Database foreign keys therefore reject cross-scope relationships even
@@ -36,11 +36,12 @@ targets are checked against their scoped business table by a database trigger.
 
 ## Tenant isolation and authorization
 
-PostgreSQL RLS is enabled and forced on all 46 non-catalog tables. The four global
+PostgreSQL RLS is enabled and forced on all 47 non-catalog tables. The four global
 catalogs are currencies, countries, permissions, and unit definitions. An unscoped
 runtime query returns no owned records. User rows are restricted to the current
 actor. Tenant/branding queries are tenant-scoped; organization and business queries
-are organization-scoped. Financial and inventory views use `security_invoker` so
+are organization-scoped. `idempotency_keys` is additionally restricted to the
+current user, so members cannot see or replay each other's requests. Financial and inventory views use `security_invoker` so
 they retain the underlying row policies.
 
 Use `withOrganization(runtimeDb, selection, callback)` only after authentication
@@ -91,7 +92,7 @@ refuses remote/production databases. Provision production roles through reviewed
 infrastructure using the grant strategy in `packages/db/src/runtime-role.ts`.
 
 Schema ownership alone does not bypass forced RLS. Local administrative fixtures
-use the PostgreSQL administrator. Before production signup is implemented, Task #2
+use the PostgreSQL administrator. Before production signup is implemented, Task #3
 must define a narrow registration/bootstrap routine or dedicated authentication
 role with explicit permissions; it must not give the API migration credentials.
 
@@ -107,13 +108,19 @@ Financial input/output contracts use decimal strings. Use Prisma Decimal and
 explicit rounding when business calculations are implemented. Row checks enforce
 `total = subtotal - discount + tax` and
 `lineTotal = round(quantity * unitPrice, 2) - discount + tax`; values must fit the
-specified precision. Do not use JavaScript floating-point totals. Raw BigInt file
+specified precision. Do not use JavaScript floating-point totals. Use
+`calculateLineAmounts`/`calculateDocumentTotals` from `@repo/utils`: they use
+ROUND_HALF_UP (PostgreSQL `round()` semantics, verified against the database in
+tests). Header `subtotal` is the sum of gross line amounts (`round(qty × price, 2)`).
+Header `discount`/`tax` are line totals plus document-level values. Raw BigInt file
 sizes/counters also require explicit DTO serialization before future HTTP use.
 
 ## Integrity and lifecycle
 
 Master data has soft-deletion timestamps. Financial parent documents cannot be
 hard-deleted; use a state transition and required reason/actor/time metadata.
+AuditLog has a first-class `reason` column for void/cancel/adjustment entries; write
+it with `recordAudit` in the same transaction as the change.
 AuditLog and InventoryMovement reject UPDATE and DELETE, including privileged
 table-owner attempts. Reversals are new records; movements have a scoped optional
 `reversalOfId`. Owned records cannot be reassigned to another scope.
@@ -135,6 +142,15 @@ not substitutes for the later posting engines.
 the padded number. Call it in the same transaction that creates the document; a
 failed transaction rolls the increment back. Never allocate numbers from counts.
 Sequence prefixes are authoritative here rather than duplicated in settings.
+
+## Idempotency and locking
+
+`idempotency_keys` stores one committed response per member, organization, and
+client key for 24 hours. `claimIdempotencyKey` uses `INSERT … ON CONFLICT` in the
+request transaction, so concurrent duplicates wait on the unique index and then
+replay. A rolled-back request leaves no key. `lockRows` takes `FOR UPDATE` locks
+in ascending ID order on an allow-listed table to prevent lost updates and lock-order
+deadlocks. See [API platform](api.md) for the HTTP contract.
 
 ## Migrations, ERD, and seeds
 

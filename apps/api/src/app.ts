@@ -10,12 +10,20 @@ import {
   errorResponseSchema,
   liveHealthSchema,
   readyHealthSchema,
-  serviceInfoSchema,
   unavailableHealthSchema,
 } from '@repo/validation';
 import swaggerUi from 'swagger-ui-express';
+import {
+  denyAllAuthenticator,
+  resolveAuthentication,
+  type Authenticator,
+} from './http/authentication.js';
+import { buildOpenApiPaths } from './http/openapi-paths.js';
+import type { ApiRoute } from './http/route.js';
+import { createApiRouter, type OrganizationRunner } from './http/router.js';
 import { ApiError } from './lib/api-error.js';
 import { errorHandler } from './middleware/error-handler.js';
+import { apiRoutes } from './modules/index.js';
 import { createOpenApiDocument } from './openapi.js';
 
 export interface AppDependencies {
@@ -23,14 +31,28 @@ export interface AppDependencies {
   logger: Logger;
   checkDatabase: () => Promise<void>;
   isShuttingDown?: () => boolean;
+  /** Resolves the session; defaults to denying every organization route. */
+  authenticator?: Authenticator;
+  /** Scoped transaction runner; production binds withOrganization to the runtime client. */
+  runInOrganization?: OrganizationRunner;
+  routes?: readonly ApiRoute[];
 }
+
+const databaseNotConfigured: OrganizationRunner = async () => {
+  throw new Error('Organization database access is not configured');
+};
 
 export function createApp({
   config,
   logger,
   checkDatabase,
   isShuttingDown = () => false,
+  authenticator = denyAllAuthenticator,
+  runInOrganization = databaseNotConfigured,
+  routes = apiRoutes,
 }: AppDependencies) {
+  // Fails fast on duplicate operations or path/params drift even when docs are off.
+  buildOpenApiPaths(routes);
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', config.TRUST_PROXY_HOPS);
@@ -48,6 +70,17 @@ export function createApp({
           method: req.method,
           url: req.url?.split('?')[0],
         }),
+      },
+      // Bodies are never logged: auth routes carry passwords and tokens.
+      customProps: (_req, res) => {
+        const auth = (res as express.Response).locals?.auth;
+        return auth
+          ? {
+              userId: auth.userId,
+              tenantId: auth.tenantId,
+              organizationId: auth.organizationId,
+            }
+          : {};
       },
       autoLogging: { ignore: (req) => req.url === '/health/live' },
     }),
@@ -115,14 +148,14 @@ export function createApp({
       },
     }),
   );
-  app.get('/api/v1', (_req, res) => {
-    res.json(
-      serviceInfoSchema.parse({ name: 'f-application-api', version: '0.1.0' }),
-    );
-  });
+  app.use(
+    '/api/v1',
+    resolveAuthentication(authenticator),
+    createApiRouter(routes, runInOrganization),
+  );
 
   if (config.apiDocsEnabled) {
-    const document = createOpenApiDocument();
+    const document = createOpenApiDocument(routes);
     app.get('/openapi.json', (_req, res) => res.json(document));
     app.use(
       '/docs',

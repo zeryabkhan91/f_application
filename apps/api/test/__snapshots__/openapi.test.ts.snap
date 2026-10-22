@@ -1,0 +1,597 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`OpenAPI generation > derives paths, parameters, permissions, and errors from route definitions 1`] = `
+{
+  "/api/v1/customer-payments": {
+    "post": {
+      "description": "Requires an active organization membership with permission \`customer-payment.write\`.",
+      "operationId": "createCustomerPayment",
+      "parameters": [
+        {
+          "description": "Client-generated key (UUID recommended). Retries with the same key and body replay the original response for 24 hours.",
+          "in": "header",
+          "name": "Idempotency-Key",
+          "required": true,
+          "schema": {
+            "pattern": "^[A-Za-z0-9_.:-]{8,128}$",
+            "type": "string",
+          },
+        },
+      ],
+      "requestBody": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "amount": {
+                  "pattern": "^-?\\d{1,16}(?:\\.\\d{1,2})?$",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "amount",
+              ],
+              "type": "object",
+            },
+          },
+        },
+        "required": true,
+      },
+      "responses": {
+        "201": {
+          "description": "Payment recorded",
+        },
+        "400": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`INVALID_JSON\`: Body is not valid JSON. \`INVALID_IDEMPOTENCY_KEY\`: Idempotency-Key header is malformed",
+        },
+        "401": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`UNAUTHENTICATED\`: No valid session",
+        },
+        "403": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`FORBIDDEN\`: Membership lacks \`customer-payment.write\`. \`ORGANIZATION_ACCESS_DENIED\`: Membership, organization, or account is not active",
+        },
+        "409": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`IDEMPOTENCY_KEY_REUSED\`: Key was already used with a different request",
+        },
+        "413": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`PAYLOAD_TOO_LARGE\`: Body exceeds 1 MB",
+        },
+        "422": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`VALIDATION_ERROR\`: Input failed validation; see error.fields",
+        },
+        "428": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`IDEMPOTENCY_KEY_REQUIRED\`: Idempotency-Key header is missing",
+        },
+        "429": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`RATE_LIMITED\`: Too many requests",
+        },
+        "500": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`INTERNAL_ERROR\`: Unexpected server error",
+        },
+      },
+      "summary": "Receive a payment",
+      "tags": [
+        "Payments",
+      ],
+      "x-permission": "customer-payment.write",
+    },
+  },
+  "/api/v1/customers": {
+    "get": {
+      "description": "Requires an active organization membership with permission \`customer.read\`.",
+      "operationId": "listCustomers",
+      "parameters": [
+        {
+          "in": "query",
+          "name": "page",
+          "required": false,
+          "schema": {
+            "default": 1,
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "type": "integer",
+          },
+        },
+        {
+          "in": "query",
+          "name": "pageSize",
+          "required": false,
+          "schema": {
+            "default": 20,
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer",
+          },
+        },
+        {
+          "in": "query",
+          "name": "search",
+          "required": false,
+          "schema": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string",
+          },
+        },
+        {
+          "in": "query",
+          "name": "sortBy",
+          "required": false,
+          "schema": {
+            "default": "name",
+            "enum": [
+              "name",
+              "createdAt",
+            ],
+            "type": "string",
+          },
+        },
+        {
+          "in": "query",
+          "name": "sortOrder",
+          "required": false,
+          "schema": {
+            "default": "asc",
+            "enum": [
+              "asc",
+              "desc",
+            ],
+            "type": "string",
+          },
+        },
+        {
+          "in": "query",
+          "name": "dateFrom",
+          "required": false,
+          "schema": {
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            "type": "string",
+          },
+        },
+        {
+          "in": "query",
+          "name": "dateTo",
+          "required": false,
+          "schema": {
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            "type": "string",
+          },
+        },
+        {
+          "in": "query",
+          "name": "status",
+          "required": false,
+          "schema": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE",
+            ],
+            "type": "string",
+          },
+        },
+      ],
+      "responses": {
+        "200": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "data": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "creditLimit": {
+                          "pattern": "^-?\\d{1,16}(?:\\.\\d{1,2})?$",
+                          "type": "string",
+                        },
+                        "id": {
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                          "type": "string",
+                        },
+                        "name": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "creditLimit",
+                      ],
+                      "type": "object",
+                    },
+                    "type": "array",
+                  },
+                  "meta": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "page": {
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "pageSize": {
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "total": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "totalPages": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                    },
+                    "required": [
+                      "page",
+                      "pageSize",
+                      "total",
+                      "totalPages",
+                    ],
+                    "type": "object",
+                  },
+                },
+                "required": [
+                  "data",
+                  "meta",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "description": "One page of customers",
+        },
+        "401": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`UNAUTHENTICATED\`: No valid session",
+        },
+        "403": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`FORBIDDEN\`: Membership lacks \`customer.read\`. \`ORGANIZATION_ACCESS_DENIED\`: Membership, organization, or account is not active",
+        },
+        "422": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`VALIDATION_ERROR\`: Input failed validation; see error.fields",
+        },
+        "429": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`RATE_LIMITED\`: Too many requests",
+        },
+        "500": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`INTERNAL_ERROR\`: Unexpected server error",
+        },
+      },
+      "summary": "List customers",
+      "tags": [
+        "Customers",
+      ],
+      "x-permission": "customer.read",
+    },
+  },
+  "/api/v1/customers/{id}": {
+    "patch": {
+      "description": "Changes contact details.
+
+Requires an active organization membership with permission \`customer.write\`.",
+      "operationId": "updateCustomer",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "type": "string",
+          },
+        },
+      ],
+      "requestBody": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "name": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "type": "object",
+            },
+          },
+        },
+        "required": true,
+      },
+      "responses": {
+        "200": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "data": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "creditLimit": {
+                        "pattern": "^-?\\d{1,16}(?:\\.\\d{1,2})?$",
+                        "type": "string",
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "creditLimit",
+                    ],
+                    "type": "object",
+                  },
+                },
+                "required": [
+                  "data",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "description": "Updated customer",
+        },
+        "400": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`INVALID_JSON\`: Body is not valid JSON",
+        },
+        "401": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`UNAUTHENTICATED\`: No valid session",
+        },
+        "403": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`FORBIDDEN\`: Membership lacks \`customer.write\`. \`ORGANIZATION_ACCESS_DENIED\`: Membership, organization, or account is not active",
+        },
+        "404": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`NOT_FOUND\`: Customer does not exist",
+        },
+        "409": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`DUPLICATE\`: Name already used",
+        },
+        "413": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`PAYLOAD_TOO_LARGE\`: Body exceeds 1 MB",
+        },
+        "422": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`VALIDATION_ERROR\`: Input failed validation; see error.fields",
+        },
+        "429": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`RATE_LIMITED\`: Too many requests",
+        },
+        "500": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`INTERNAL_ERROR\`: Unexpected server error",
+        },
+      },
+      "summary": "Update a customer",
+      "tags": [
+        "Customers",
+      ],
+      "x-permission": "customer.write",
+    },
+  },
+  "/api/v1/status": {
+    "get": {
+      "operationId": "getStatus",
+      "responses": {
+        "200": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "ok": {
+                    "type": "boolean",
+                  },
+                },
+                "required": [
+                  "ok",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "description": "OK",
+        },
+        "429": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`RATE_LIMITED\`: Too many requests",
+        },
+        "500": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse",
+              },
+            },
+          },
+          "description": "\`INTERNAL_ERROR\`: Unexpected server error",
+        },
+      },
+      "summary": "Status",
+      "tags": [
+        "System",
+      ],
+    },
+  },
+}
+`;
